@@ -22,7 +22,7 @@ dependencies:
   # Internationalization
   flutter_localizations:
     sdk: flutter
-  intl: ^0.18.1
+  intl: any
 
   # Location Services
   geolocator: ^10.1.0
@@ -32,9 +32,6 @@ dependencies:
   cached_network_image: ^3.3.0
   image_picker: ^1.0.5
   flutter_svg: ^2.0.9
-
-  # Chat
-  dash_chat_2: ^0.0.18
 
   # Utilities
   uuid: ^4.2.1
