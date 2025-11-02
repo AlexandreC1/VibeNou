@@ -3,9 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Uncomment when Firebase is configured
-// import 'package:firebase_core/firebase_core.dart';
-// import 'utils/firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'utils/firebase_options.dart';
 
 import 'l10n/app_localizations.dart';
 import 'utils/app_theme.dart';
@@ -18,10 +17,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  // Uncomment when Firebase is configured
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const MyApp());
 }

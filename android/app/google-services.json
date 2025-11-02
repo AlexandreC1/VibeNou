@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "161222852953",
+    "project_id": "vibenou-5d701",
+    "storage_bucket": "vibenou-5d701.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:161222852953:android:59c904d713b999ba890c48",
+        "android_client_info": {
+          "package_name": "com.vibenou.vibenou"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXYedN9RWDBdnIQdA00EeDggAgfnonrAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

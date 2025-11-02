@@ -46,15 +46,11 @@ class _SplashScreenState extends State<SplashScreen>
     final authService = Provider.of<AuthService>(context, listen: false);
 
     // Check if user is logged in
-    // Uncomment when Firebase is configured
-    // if (authService.currentUser != null) {
-    //   Navigator.of(context).pushReplacementNamed('/main');
-    // } else {
-    //   Navigator.of(context).pushReplacementNamed('/login');
-    // }
-
-    // For now, always go to login
-    Navigator.of(context).pushReplacementNamed('/login');
+    if (authService.currentUser != null) {
+      Navigator.of(context).pushReplacementNamed('/main');
+    } else {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   @override

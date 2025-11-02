@@ -100,10 +100,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Sign up failed';
+
+        // Parse Firebase errors
+        if (e.toString().contains('CONFIGURATION_NOT_FOUND')) {
+          errorMessage = 'Firebase Authentication is not configured. Please enable Email/Password sign-in in Firebase Console.';
+        } else if (e.toString().contains('email-already-in-use')) {
+          errorMessage = 'This email is already registered. Please login instead.';
+        } else if (e.toString().contains('weak-password')) {
+          errorMessage = 'Password is too weak. Please use a stronger password.';
+        } else if (e.toString().contains('invalid-email')) {
+          errorMessage = 'Invalid email address.';
+        } else {
+          errorMessage = 'Sign up failed: ${e.toString()}';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sign up failed: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: AppTheme.coral,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -115,8 +131,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _nextPage() {
+    // Validate current page before proceeding
     if (_currentPage == 0) {
-      // Validate first page
+      // Validate first page (account info)
       if (!_formKey.currentState!.validate()) return;
       if (_passwordController.text != _confirmPasswordController.text) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +144,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         );
         return;
       }
+    } else if (_currentPage == 1) {
+      // Validate second page (profile info)
+      if (!_formKey.currentState!.validate()) return;
     }
 
     if (_currentPage < 2) {

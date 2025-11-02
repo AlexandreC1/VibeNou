@@ -43,10 +43,28 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Login failed';
+
+        // Parse Firebase errors
+        if (e.toString().contains('CONFIGURATION_NOT_FOUND')) {
+          errorMessage = 'Firebase Authentication is not configured. Please enable Email/Password sign-in in Firebase Console.';
+        } else if (e.toString().contains('user-not-found')) {
+          errorMessage = 'No account found with this email. Please sign up first.';
+        } else if (e.toString().contains('wrong-password')) {
+          errorMessage = 'Incorrect password. Please try again.';
+        } else if (e.toString().contains('invalid-email')) {
+          errorMessage = 'Invalid email address.';
+        } else if (e.toString().contains('user-disabled')) {
+          errorMessage = 'This account has been disabled.';
+        } else {
+          errorMessage = 'Login failed: ${e.toString()}';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: AppTheme.coral,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
