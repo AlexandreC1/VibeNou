@@ -12,22 +12,46 @@ import 'utils/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_screen.dart';
+import 'screens/setup_screen.dart';
 import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  // Uncomment when Firebase is configured
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  // Check if Firebase is configured
+  bool firebaseConfigured = false;
+  String? errorMessage;
 
-  runApp(const MyApp());
+  try {
+    // Uncomment these lines when Firebase is configured:
+    // await Firebase.initializeApp(
+    //   options: DefaultFirebaseOptions.currentPlatform,
+    // );
+    // firebaseConfigured = true;
+
+    // For now, Firebase is not configured
+    firebaseConfigured = false;
+    errorMessage = 'Firebase not configured. Please follow the setup guide.';
+  } catch (e) {
+    firebaseConfigured = false;
+    errorMessage = 'Firebase initialization failed: $e';
+  }
+
+  runApp(MyApp(
+    firebaseConfigured: firebaseConfigured,
+    errorMessage: errorMessage,
+  ));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  final bool firebaseConfigured;
+  final String? errorMessage;
+
+  const MyApp({
+    super.key,
+    required this.firebaseConfigured,
+    this.errorMessage,
+  });
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -83,10 +107,13 @@ class _MyAppState extends State<MyApp> {
           Locale('fr', ''), // French
           Locale('ht', ''), // Haitian Creole
         ],
-        home: const SplashScreen(),
+        home: widget.firebaseConfigured
+            ? const SplashScreen()
+            : SetupScreen(errorMessage: widget.errorMessage),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/main': (context) => const MainScreen(),
+          '/setup': (context) => SetupScreen(errorMessage: widget.errorMessage),
         },
       ),
     );
