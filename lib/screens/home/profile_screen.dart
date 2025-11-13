@@ -24,14 +24,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserProfile() async {
+    print('Loading user profile...');
     final authService = Provider.of<AuthService>(context, listen: false);
-    if (authService.currentUser != null) {
+
+    if (authService.currentUser == null) {
+      print('ERROR: No authenticated user in profile screen');
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to view your profile'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
+      return;
+    }
+
+    print('Fetching user data for UID: ${authService.currentUser!.uid}');
+
+    try {
       final user = await authService.getUserData(authService.currentUser!.uid);
+
+      if (user == null) {
+        print('ERROR: User data not found in Firestore');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile not found. Please try logging in again.'),
+              backgroundColor: AppTheme.coral,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      print('Profile loaded successfully: ${user.name}');
+      print('Location: ${user.location != null ? "Set (${user.city})" : "Not set"}');
+      print('Interests: ${user.interests.length} interests');
+
       setState(() {
         _currentUser = user;
         _isLoading = false;
       });
-    } else {
+    } catch (e) {
+      print('ERROR loading profile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading profile: $e'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
       setState(() => _isLoading = false);
     }
   }

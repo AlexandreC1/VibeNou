@@ -21,6 +21,9 @@ class AuthService {
     required String bio,
     required List<String> interests,
     String preferredLanguage = 'en',
+    GeoPoint? location,
+    String? city,
+    String? country,
   }) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -38,6 +41,9 @@ class AuthService {
           age: age,
           bio: bio,
           interests: interests,
+          location: location,
+          city: city,
+          country: country,
           createdAt: DateTime.now(),
           lastActive: DateTime.now(),
           preferredLanguage: preferredLanguage,

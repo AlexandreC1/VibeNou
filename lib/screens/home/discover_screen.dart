@@ -46,60 +46,139 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {
       final user = await authService.getUserData(authService.currentUser!.uid);
-      setState(() {
-        _currentUser = user;
-      });
-      _loadNearbyUsers();
-      _loadSimilarUsers();
-    }
-  }
-
-  Future<void> _loadNearbyUsers() async {
-    if (_currentUser == null || _currentUser!.location == null) {
-      // Request location permission
-      final position = await _locationService.getCurrentPosition();
-      if (position == null) {
+      if (user == null) {
+        print('ERROR: User data not found in Firestore for ${authService.currentUser!.uid}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permission required'),
+              content: Text('User profile not found. Please try logging in again.'),
               backgroundColor: AppTheme.coral,
             ),
           );
         }
         return;
       }
+      setState(() {
+        _currentUser = user;
+      });
+      print('Current user loaded: ${user.name}, Location: ${user.location != null ? "Set" : "Not set"}');
+      _loadNearbyUsers();
+      _loadSimilarUsers();
+    } else {
+      print('ERROR: No authenticated user');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to continue'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadNearbyUsers() async {
+    print('Loading nearby users...');
+
+    if (_currentUser == null) {
+      print('ERROR: Current user is null');
+      setState(() => _isLoadingNearby = false);
+      return;
+    }
+
+    if (_currentUser!.location == null) {
+      print('User location not set, requesting permission...');
+      // Request location permission
+      final position = await _locationService.getCurrentPosition();
+      if (position == null) {
+        print('ERROR: Failed to get location permission');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission required to find nearby users'),
+              backgroundColor: AppTheme.coral,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        setState(() => _isLoadingNearby = false);
+        return;
+      }
+
+      print('Got location: ${position.latitude}, ${position.longitude}');
 
       // Update user location
       final authService = Provider.of<AuthService>(context, listen: false);
       if (authService.currentUser != null) {
-        await _userService.updateUserLocation(
-          authService.currentUser!.uid,
-          position,
-        );
-        _currentUser = _currentUser?.copyWith(
-          location: GeoPoint(position.latitude, position.longitude),
-        );
+        try {
+          // Get city and country
+          final address = await _locationService.getAddressFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+
+          await _userService.updateUserLocation(
+            authService.currentUser!.uid,
+            position,
+            city: address?['city'],
+            country: address?['country'],
+          );
+
+          _currentUser = _currentUser?.copyWith(
+            location: GeoPoint(position.latitude, position.longitude),
+            city: address?['city'],
+            country: address?['country'],
+          );
+
+          print('Location updated in Firestore');
+        } catch (e) {
+          print('ERROR updating location: $e');
+        }
       }
     }
 
-    if (_currentUser?.location == null) return;
+    if (_currentUser?.location == null) {
+      print('ERROR: Still no location after update attempt');
+      return;
+    }
 
     setState(() => _isLoadingNearby = true);
 
     try {
+      print('Searching for users within 50km of ${_currentUser!.location!.latitude}, ${_currentUser!.location!.longitude}');
+
       final users = await _userService.getNearbyUsers(
         currentUserId: _currentUser!.uid,
         userLocation: _currentUser!.location!,
         radiusInKm: 50,
       );
 
+      print('Found ${users.length} nearby users');
+
       setState(() {
         _nearbyUsers = users;
         _isLoadingNearby = false;
       });
+
+      if (users.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No users found nearby. Try creating more test accounts!'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
+      print('ERROR loading nearby users: $e');
       setState(() => _isLoadingNearby = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading nearby users: $e'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
     }
   }
 
@@ -195,15 +274,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           final user = _nearbyUsers[index];
           double? distance;
           if (_currentUser?.location != null && user.location != null) {
-            distance = _userService.calculateSimilarity(
-              [
-                _currentUser!.location!.latitude.toString(),
-                _currentUser!.location!.longitude.toString()
-              ],
-              [
-                user.location!.latitude.toString(),
-                user.location!.longitude.toString()
-              ],
+            distance = _locationService.getDistanceBetween(
+              _currentUser!.location!.latitude,
+              _currentUser!.location!.longitude,
+              user.location!.latitude,
+              user.location!.longitude,
             );
           }
 

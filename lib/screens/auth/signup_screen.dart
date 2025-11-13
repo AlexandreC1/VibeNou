@@ -80,10 +80,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final locationService = LocationService();
 
       // Get user location
-      final position = await locationService.getCurrentPosition();
       GeoPoint? geoPoint;
+      String? city;
+      String? country;
+
+      final position = await locationService.getCurrentPosition();
       if (position != null) {
         geoPoint = GeoPoint(position.latitude, position.longitude);
+
+        // Get address from coordinates
+        final address = await locationService.getAddressFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (address != null) {
+          city = address['city'];
+          country = address['country'];
+        }
       }
 
       await authService.signUp(
@@ -93,6 +107,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         age: int.parse(_ageController.text),
         bio: _bioController.text.trim(),
         interests: _selectedInterests,
+        location: geoPoint,
+        city: city,
+        country: country,
       );
 
       if (mounted) {
