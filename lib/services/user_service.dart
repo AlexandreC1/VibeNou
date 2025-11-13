@@ -1,145 +1,397 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
-import 'dart:math';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
+import 'supabase_service.dart';
 
+/// User service for managing user profiles and discovery features
+/// Handles user CRUD operations, nearby user queries, and interest-based matching
 class UserService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = SupabaseService.instance.client;
 
-  // Get all users (for discovery)
-  Stream<List<UserModel>> getAllUsers(String currentUserId) {
-    return _firestore
-        .collection('users')
-        .where('uid', isNotEqualTo: currentUserId)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => UserModel.fromMap(doc.data(), doc.id))
-            .toList());
+  /// Get user profile by ID
+  Future<UserModel?> getUserProfile(String userId) async {
+    try {
+      final response = await _supabase
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return UserModel.fromJson(response);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching user profile: $e');
+      }
+      return null;
+    }
   }
 
-  // Get nearby users based on location
-  Future<List<UserModel>> getNearbyUsers({
-    required String currentUserId,
-    required GeoPoint userLocation,
-    double radiusInKm = 50,
+  /// Get multiple user profiles by IDs
+  Future<List<UserModel>> getUserProfiles(List<String> userIds) async {
+    try {
+      if (userIds.isEmpty) return [];
+
+      final response = await _supabase
+          .from('users')
+          .select()
+          .inFilter('id', userIds);
+
+      return (response as List)
+          .map((json) => UserModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching user profiles: $e');
+      }
+      return [];
+    }
+  }
+
+  /// Update user profile
+  Future<void> updateUserProfile({
+    required String userId,
+    String? name,
+    int? age,
+    String? bio,
+    List<String>? interests,
+    String? photoUrl,
+    String? city,
+    String? country,
+    String? preferredLanguage,
   }) async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('users')
-          .where('uid', isNotEqualTo: currentUserId)
-          .get();
+      if (kDebugMode) {
+        print('📝 Updating user profile: $userId');
+      }
 
-      List<UserModel> allUsers = snapshot.docs
-          .map((doc) => UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+      final Map<String, dynamic> updates = {
+        'last_active': DateTime.now().toIso8601String(),
+      };
+
+      if (name != null) updates['name'] = name;
+      if (age != null) updates['age'] = age;
+      if (bio != null) updates['bio'] = bio;
+      if (interests != null) updates['interests'] = interests;
+      if (photoUrl != null) updates['photo_url'] = photoUrl;
+      if (city != null) updates['city'] = city;
+      if (country != null) updates['country'] = country;
+      if (preferredLanguage != null) {
+        updates['preferred_language'] = preferredLanguage;
+      }
+
+      await _supabase.from('users').update(updates).eq('id', userId);
+
+      if (kDebugMode) {
+        print('✅ User profile updated successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error updating user profile: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Update user location using PostGIS POINT format
+  Future<void> updateUserLocation({
+    required String userId,
+    required double latitude,
+    required double longitude,
+    String? city,
+    String? country,
+  }) async {
+    try {
+      if (kDebugMode) {
+        print('📍 Updating user location: $userId');
+      }
+
+      // Use PostGIS POINT format: POINT(longitude latitude)
+      // Note: PostGIS uses (lon, lat) order, not (lat, lon)
+      final Map<String, dynamic> updates = {
+        'location': 'POINT($longitude $latitude)',
+        'last_active': DateTime.now().toIso8601String(),
+      };
+
+      if (city != null) updates['city'] = city;
+      if (country != null) updates['country'] = country;
+
+      await _supabase.from('users').update(updates).eq('id', userId);
+
+      if (kDebugMode) {
+        print('✅ User location updated successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error updating user location: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Get nearby users using PostGIS distance queries
+  /// Uses the get_nearby_users database function
+  Future<List<NearbyUser>> getNearbyUsers({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 50,
+    int maxResults = 50,
+  }) async {
+    try {
+      if (kDebugMode) {
+        print('🔍 Searching for nearby users within ${radiusKm}km');
+      }
+
+      final response = await _supabase.rpc(
+        'get_nearby_users',
+        params: {
+          'user_lat': latitude,
+          'user_lng': longitude,
+          'radius_km': radiusKm,
+          'max_results': maxResults,
+        },
+      );
+
+      if (response == null) return [];
+
+      final users = (response as List)
+          .map((json) => NearbyUser.fromJson(json))
           .toList();
 
-      // Filter by distance
-      List<UserModel> nearbyUsers = [];
-      for (var user in allUsers) {
-        if (user.location != null) {
-          double distance = _calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            user.location!.latitude,
-            user.location!.longitude,
+      if (kDebugMode) {
+        print('✅ Found ${users.length} nearby users');
+      }
+
+      return users;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching nearby users: $e');
+      }
+      return [];
+    }
+  }
+
+  /// Get users with similar interests
+  /// Uses the get_users_by_interests database function
+  Future<List<SimilarInterestUser>> getUsersBySimilarInterests({
+    required List<String> interests,
+    int maxResults = 50,
+  }) async {
+    try {
+      if (kDebugMode) {
+        print('🔍 Searching for users with similar interests');
+      }
+
+      if (interests.isEmpty) {
+        if (kDebugMode) {
+          print('⚠️  No interests provided, returning empty list');
+        }
+        return [];
+      }
+
+      final response = await _supabase.rpc(
+        'get_users_by_interests',
+        params: {
+          'user_interests': interests,
+          'max_results': maxResults,
+        },
+      );
+
+      if (response == null) return [];
+
+      final users = (response as List)
+          .map((json) => SimilarInterestUser.fromJson(json))
+          .toList();
+
+      if (kDebugMode) {
+        print('✅ Found ${users.length} users with similar interests');
+      }
+
+      return users;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching users by interests: $e');
+      }
+      return [];
+    }
+  }
+
+  /// Upload profile photo to Supabase Storage
+  /// Returns the public URL of the uploaded photo
+  Future<String?> uploadProfilePhoto({
+    required String userId,
+    required XFile imageFile,
+  }) async {
+    try {
+      if (kDebugMode) {
+        print('📤 Uploading profile photo for user: $userId');
+      }
+
+      // Read file as bytes
+      final bytes = await imageFile.readAsBytes();
+      final fileExt = imageFile.path.split('.').last;
+      final fileName = '$userId/profile.$fileExt';
+
+      // Upload to Supabase Storage
+      await _supabase.storage.from('profile-photos').uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: 'image/$fileExt',
+              upsert: true, // Overwrite if exists
+            ),
           );
-          if (distance <= radiusInKm) {
-            nearbyUsers.add(user);
-          }
+
+      // Get public URL
+      final publicUrl = _supabase.storage
+          .from('profile-photos')
+          .getPublicUrl(fileName);
+
+      if (kDebugMode) {
+        print('✅ Profile photo uploaded successfully');
+      }
+
+      return publicUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error uploading profile photo: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Delete profile photo from Supabase Storage
+  Future<void> deleteProfilePhoto(String userId) async {
+    try {
+      if (kDebugMode) {
+        print('🗑️  Deleting profile photo for user: $userId');
+      }
+
+      // List all files in user's folder
+      final files = await _supabase.storage
+          .from('profile-photos')
+          .list(path: userId);
+
+      // Delete all files
+      final filePaths = files.map((file) => '$userId/${file.name}').toList();
+      if (filePaths.isNotEmpty) {
+        await _supabase.storage.from('profile-photos').remove(filePaths);
+      }
+
+      if (kDebugMode) {
+        print('✅ Profile photo deleted successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error deleting profile photo: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Update last active timestamp
+  Future<void> updateLastActive(String userId) async {
+    try {
+      await _supabase.from('users').update({
+        'last_active': DateTime.now().toIso8601String(),
+      }).eq('id', userId);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error updating last active: $e');
+      }
+      // Don't rethrow as this is a non-critical operation
+    }
+  }
+
+  /// Delete user profile and all associated data
+  Future<void> deleteUserProfile(String userId) async {
+    try {
+      if (kDebugMode) {
+        print('🗑️  Deleting user profile: $userId');
+      }
+
+      // Delete profile photo first
+      try {
+        await deleteProfilePhoto(userId);
+      } catch (e) {
+        // Continue even if photo deletion fails
+        if (kDebugMode) {
+          print('⚠️  Failed to delete profile photo: $e');
         }
       }
 
-      return nearbyUsers;
+      // Delete user record (cascade will delete related data)
+      await _supabase.from('users').delete().eq('id', userId);
+
+      if (kDebugMode) {
+        print('✅ User profile deleted successfully');
+      }
     } catch (e) {
-      print('Error getting nearby users: $e');
-      return [];
+      if (kDebugMode) {
+        print('❌ Error deleting user profile: $e');
+      }
+      rethrow;
     }
   }
 
-  // Calculate distance between two points (Haversine formula)
-  double _calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const double earthRadius = 6371; // km
-    double dLat = _degreesToRadians(lat2 - lat1);
-    double dLon = _degreesToRadians(lon2 - lon1);
-
-    double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) *
-            cos(_degreesToRadians(lat2)) *
-            sin(dLon / 2) *
-            sin(dLon / 2);
-
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return earthRadius * c;
-  }
-
-  double _degreesToRadians(double degrees) {
-    return degrees * pi / 180;
-  }
-
-  // Calculate similarity score based on interests
-  double calculateSimilarity(List<String> interests1, List<String> interests2) {
-    if (interests1.isEmpty || interests2.isEmpty) return 0.0;
-
-    Set<String> set1 = interests1.map((e) => e.toLowerCase()).toSet();
-    Set<String> set2 = interests2.map((e) => e.toLowerCase()).toSet();
-
-    int commonInterests = set1.intersection(set2).length;
-    int totalInterests = set1.union(set2).length;
-
-    return totalInterests > 0 ? (commonInterests / totalInterests) * 100 : 0.0;
-  }
-
-  // Get users sorted by similarity
-  Future<List<Map<String, dynamic>>> getUsersBySimilarity({
-    required String currentUserId,
-    required List<String> currentUserInterests,
-  }) async {
+  /// Search users by name
+  Future<List<UserModel>> searchUsersByName(String query) async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('users')
-          .where('uid', isNotEqualTo: currentUserId)
-          .get();
+      if (query.trim().isEmpty) return [];
 
-      List<Map<String, dynamic>> usersWithSimilarity = [];
-
-      for (var doc in snapshot.docs) {
-        UserModel user = UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        double similarity = calculateSimilarity(currentUserInterests, user.interests);
-
-        usersWithSimilarity.add({
-          'user': user,
-          'similarity': similarity,
-        });
+      if (kDebugMode) {
+        print('🔍 Searching users by name: $query');
       }
 
-      // Sort by similarity score
-      usersWithSimilarity.sort((a, b) =>
-          (b['similarity'] as double).compareTo(a['similarity'] as double));
+      final response = await _supabase
+          .from('users')
+          .select()
+          .ilike('name', '%$query%')
+          .limit(20);
 
-      return usersWithSimilarity;
+      final users = (response as List)
+          .map((json) => UserModel.fromJson(json))
+          .toList();
+
+      if (kDebugMode) {
+        print('✅ Found ${users.length} users matching "$query"');
+      }
+
+      return users;
     } catch (e) {
-      print('Error getting users by similarity: $e');
+      if (kDebugMode) {
+        print('❌ Error searching users: $e');
+      }
       return [];
     }
   }
 
-  // Update user location
-  Future<void> updateUserLocation(String uid, Position position, {String? city, String? country}) async {
+  /// Get all users (paginated)
+  Future<List<UserModel>> getAllUsers({
+    int page = 0,
+    int pageSize = 20,
+  }) async {
     try {
-      await _firestore.collection('users').doc(uid).update({
-        'location': GeoPoint(position.latitude, position.longitude),
-        'city': city,
-        'country': country,
-        'lastActive': FieldValue.serverTimestamp(),
-      });
+      final from = page * pageSize;
+      final to = from + pageSize - 1;
+
+      final response = await _supabase
+          .from('users')
+          .select()
+          .order('last_active', ascending: false)
+          .range(from, to);
+
+      return (response as List)
+          .map((json) => UserModel.fromJson(json))
+          .toList();
     } catch (e) {
-      print('Error updating location: $e');
-      rethrow;
+      if (kDebugMode) {
+        print('❌ Error fetching all users: $e');
+      }
+      return [];
     }
   }
 }

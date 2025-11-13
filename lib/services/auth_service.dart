@@ -1,138 +1,368 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
+import 'supabase_service.dart';
 
+/// Authentication service for managing user sign up, sign in, and OAuth
+/// Handles all authentication-related operations using Supabase Auth
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = SupabaseService.instance.client;
 
-  // Get current user
-  User? get currentUser => _auth.currentUser;
+  /// Get current authenticated user
+  User? get currentUser => _supabase.auth.currentUser;
 
-  // Auth state changes stream
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  /// Get current user ID
+  String? get currentUserId => _supabase.auth.currentUser?.id;
 
-  // Sign up with email and password
-  Future<UserModel?> signUp({
+  /// Get current user email
+  String? get currentUserEmail => _supabase.auth.currentUser?.email;
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => currentUser != null;
+
+  /// Stream of auth state changes
+  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+
+  /// Sign up with email and password
+  /// Creates a new user in Supabase Auth and user profile in the database
+  Future<UserModel> signUp({
     required String email,
     required String password,
     required String name,
     required int age,
-    required String bio,
-    required List<String> interests,
+    String? bio,
+    List<String> interests = const [],
     String preferredLanguage = 'en',
   }) async {
     try {
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
+      if (kDebugMode) {
+        print('📝 Signing up user: $email');
+      }
+
+      // Validate age requirement
+      if (age < 13) {
+        throw Exception('You must be at least 13 years old to sign up');
+      }
+
+      // Sign up with Supabase Auth
+      final authResponse = await _supabase.auth.signUp(
         email: email,
         password: password,
       );
 
-      User? user = result.user;
-      if (user != null) {
-        // Create user profile in Firestore
-        UserModel userModel = UserModel(
-          uid: user.uid,
-          email: email,
-          name: name,
-          age: age,
-          bio: bio,
-          interests: interests,
-          createdAt: DateTime.now(),
-          lastActive: DateTime.now(),
-          preferredLanguage: preferredLanguage,
-        );
-
-        await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .set(userModel.toMap());
-
-        return userModel;
+      if (authResponse.user == null) {
+        throw Exception('Failed to create user account');
       }
+
+      final user = authResponse.user!;
+
+      if (kDebugMode) {
+        print('✅ Auth user created: ${user.id}');
+      }
+
+      // Create user profile in database
+      final userModel = UserModel(
+        id: user.id,
+        email: email,
+        name: name,
+        age: age,
+        bio: bio,
+        interests: interests,
+        createdAt: DateTime.now(),
+        lastActive: DateTime.now(),
+        preferredLanguage: preferredLanguage,
+      );
+
+      // Insert user profile into users table
+      await _supabase.from('users').insert({
+        'id': user.id,
+        'email': email,
+        'name': name,
+        'age': age,
+        'bio': bio,
+        'interests': interests,
+        'preferred_language': preferredLanguage,
+        'created_at': DateTime.now().toIso8601String(),
+        'last_active': DateTime.now().toIso8601String(),
+      });
+
+      if (kDebugMode) {
+        print('✅ User profile created in database');
+      }
+
+      return userModel;
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Auth error during sign up: ${e.message}');
+      }
+      throw Exception(e.message);
     } catch (e) {
-      print('Sign up error: $e');
+      if (kDebugMode) {
+        print('❌ Unexpected error during sign up: $e');
+      }
       rethrow;
     }
-    return null;
   }
 
-  // Sign in with email and password
-  Future<UserModel?> signIn({
+  /// Sign in with email and password
+  Future<UserModel> signIn({
     required String email,
     required String password,
   }) async {
     try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      if (kDebugMode) {
+        print('🔐 Signing in user: $email');
+      }
+
+      // Sign in with Supabase Auth
+      final authResponse = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      User? user = result.user;
-      if (user != null) {
+      if (authResponse.user == null) {
+        throw Exception('Failed to sign in');
+      }
+
+      final user = authResponse.user!;
+
+      if (kDebugMode) {
+        print('✅ User signed in: ${user.id}');
+      }
+
+      // Update last active timestamp
+      await _supabase.from('users').update({
+        'last_active': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+
+      // Fetch user profile from database
+      final response = await _supabase
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+      return UserModel.fromJson(response);
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Auth error during sign in: ${e.message}');
+      }
+      throw Exception(e.message);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Unexpected error during sign in: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Sign in with Google OAuth
+  Future<UserModel> signInWithGoogle() async {
+    try {
+      if (kDebugMode) {
+        print('🔐 Signing in with Google');
+      }
+
+      // Sign in with Google OAuth
+      final authResponse = await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : 'io.supabase.vibenou://login-callback',
+      );
+
+      if (!authResponse) {
+        throw Exception('Google sign in was cancelled');
+      }
+
+      // Wait for auth state change
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('Failed to get user after Google sign in');
+      }
+
+      if (kDebugMode) {
+        print('✅ Google sign in successful: ${user.id}');
+      }
+
+      // Check if user profile exists
+      final existingUser = await _supabase
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (existingUser != null) {
         // Update last active
-        await _firestore.collection('users').doc(user.uid).update({
-          'lastActive': FieldValue.serverTimestamp(),
-        });
+        await _supabase.from('users').update({
+          'last_active': DateTime.now().toIso8601String(),
+        }).eq('id', user.id);
 
-        // Get user data
-        DocumentSnapshot doc =
-            await _firestore.collection('users').doc(user.uid).get();
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
+        return UserModel.fromJson(existingUser);
       }
-    } catch (e) {
-      print('Sign in error: $e');
-      rethrow;
-    }
-    return null;
-  }
 
-  // Sign out
-  Future<void> signOut() async {
-    try {
-      if (currentUser != null) {
-        await _firestore.collection('users').doc(currentUser!.uid).update({
-          'lastActive': FieldValue.serverTimestamp(),
-        });
+      // Create new user profile for Google sign in
+      final userModel = UserModel(
+        id: user.id,
+        email: user.email ?? '',
+        name: user.userMetadata?['full_name'] ?? 'User',
+        age: 18, // Default age, user should update later
+        bio: null,
+        interests: [],
+        photoUrl: user.userMetadata?['avatar_url'],
+        createdAt: DateTime.now(),
+        lastActive: DateTime.now(),
+      );
+
+      await _supabase.from('users').insert({
+        'id': user.id,
+        'email': user.email,
+        'name': userModel.name,
+        'age': userModel.age,
+        'photo_url': userModel.photoUrl,
+        'created_at': DateTime.now().toIso8601String(),
+        'last_active': DateTime.now().toIso8601String(),
+      });
+
+      if (kDebugMode) {
+        print('✅ Google user profile created');
       }
-      await _auth.signOut();
-    } catch (e) {
-      print('Sign out error: $e');
-      rethrow;
-    }
-  }
 
-  // Get user data
-  Future<UserModel?> getUserData(String uid) async {
-    try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
-      if (doc.exists) {
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>, uid);
+      return userModel;
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Auth error during Google sign in: ${e.message}');
       }
+      throw Exception(e.message);
     } catch (e) {
-      print('Get user data error: $e');
-    }
-    return null;
-  }
-
-  // Update user profile
-  Future<void> updateUserProfile(UserModel user) async {
-    try {
-      await _firestore.collection('users').doc(user.uid).update(user.toMap());
-    } catch (e) {
-      print('Update profile error: $e');
+      if (kDebugMode) {
+        print('❌ Unexpected error during Google sign in: $e');
+      }
       rethrow;
     }
   }
 
-  // Reset password
+  /// Send password reset email
   Future<void> resetPassword(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      if (kDebugMode) {
+        print('📧 Sending password reset email to: $email');
+      }
+
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: kIsWeb
+            ? null
+            : 'io.supabase.vibenou://reset-password-callback',
+      );
+
+      if (kDebugMode) {
+        print('✅ Password reset email sent');
+      }
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Error sending password reset email: ${e.message}');
+      }
+      throw Exception(e.message);
     } catch (e) {
-      print('Reset password error: $e');
+      if (kDebugMode) {
+        print('❌ Unexpected error during password reset: $e');
+      }
       rethrow;
+    }
+  }
+
+  /// Update password for authenticated user
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      if (kDebugMode) {
+        print('🔐 Updating password');
+      }
+
+      await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      if (kDebugMode) {
+        print('✅ Password updated successfully');
+      }
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Error updating password: ${e.message}');
+      }
+      throw Exception(e.message);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Unexpected error during password update: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Sign out current user
+  Future<void> signOut() async {
+    try {
+      if (kDebugMode) {
+        print('👋 Signing out user');
+      }
+
+      // Update last active before signing out
+      if (currentUserId != null) {
+        await _supabase.from('users').update({
+          'last_active': DateTime.now().toIso8601String(),
+        }).eq('id', currentUserId!);
+      }
+
+      await _supabase.auth.signOut();
+
+      if (kDebugMode) {
+        print('✅ User signed out successfully');
+      }
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Error during sign out: ${e.message}');
+      }
+      throw Exception(e.message);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Unexpected error during sign out: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Get current user's profile from database
+  Future<UserModel?> getCurrentUserProfile() async {
+    try {
+      if (currentUserId == null) return null;
+
+      final response = await _supabase
+          .from('users')
+          .select()
+          .eq('id', currentUserId!)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return UserModel.fromJson(response);
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching user profile: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Refresh current session
+  Future<void> refreshSession() async {
+    try {
+      await _supabase.auth.refreshSession();
+      if (kDebugMode) {
+        print('✅ Session refreshed');
+      }
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        print('❌ Error refreshing session: ${e.message}');
+      }
+      throw Exception(e.message);
     }
   }
 }

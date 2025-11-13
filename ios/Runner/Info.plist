@@ -55,5 +55,13 @@
 	<string>We need your location to show you nearby users and connect you with people in your area.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to show you nearby users and connect you with people in your area.</string>
+
+	<!-- Camera and Photo Library permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to let you take profile photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need photo library access to let you select profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need photo library access to save your profile photos.</string>
 </dict>
 </plist>
