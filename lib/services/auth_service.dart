@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -87,6 +89,68 @@ class AuthService {
     return null;
   }
 
+  // Sign in with Google
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      // Trigger the Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        throw Exception('Sign-in cancelled');
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      UserCredential result = await _auth.signInWithCredential(credential);
+      User? user = result.user;
+
+      if (user != null) {
+        // Check if user document exists
+        DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+        if (!userDoc.exists) {
+          // Create new user profile for first-time Google sign-in
+          UserModel userModel = UserModel(
+            uid: user.uid,
+            email: user.email ?? '',
+            name: user.displayName ?? 'User',
+            age: 18, // Default age, user can update later
+            bio: 'Hey there! I\'m using VibeNou.',
+            interests: [],
+            createdAt: DateTime.now(),
+            lastActive: DateTime.now(),
+            preferredLanguage: 'en',
+            photoUrl: user.photoURL,
+          );
+
+          await _firestore.collection('users').doc(user.uid).set(userModel.toMap());
+          return userModel;
+        } else {
+          // Update last active for existing user
+          await _firestore.collection('users').doc(user.uid).update({
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+
+          // Get and return existing user data
+          return UserModel.fromMap(userDoc.data() as Map<String, dynamic>, user.uid);
+        }
+      }
+    } catch (e) {
+      print('Google sign in error: $e');
+      rethrow;
+    }
+    return null;
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {
@@ -95,6 +159,7 @@ class AuthService {
           'lastActive': FieldValue.serverTimestamp(),
         });
       }
+      await _googleSignIn.signOut();
       await _auth.signOut();
     } catch (e) {
       print('Sign out error: $e');

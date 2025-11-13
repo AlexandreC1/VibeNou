@@ -6,7 +6,6 @@ import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
-import '../../services/user_service.dart';
 import '../../utils/app_theme.dart';
 import '../chat/chat_screen.dart';
 
@@ -19,7 +18,6 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
-  final UserService _userService = UserService();
 
   @override
   Widget build(BuildContext context) {
@@ -97,25 +95,41 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   final unreadCount =
                       chatRoom.unreadCount[authService.currentUser!.uid] ?? 0;
 
-                  return _ChatListTile(
-                    chatRoom: chatRoom,
-                    otherUser: otherUser,
-                    unreadCount: unreadCount,
-                    onTap: () async {
-                      final currentUser = await authService
-                          .getUserData(authService.currentUser!.uid);
-                      if (currentUser != null && mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(
-                              otherUser: otherUser,
-                              currentUser: currentUser,
-                            ),
-                          ),
-                        );
-                      }
+                  // Animate each chat tile with staggered delay
+                  return TweenAnimationBuilder<double>(
+                    key: ValueKey(chatRoom.id),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: Duration(milliseconds: 300 + (index * 80)),
+                    curve: Curves.easeOut,
+                    builder: (context, value, child) {
+                      return Transform.translate(
+                        offset: Offset(-30 * (1 - value), 0),
+                        child: Opacity(
+                          opacity: value,
+                          child: child,
+                        ),
+                      );
                     },
+                    child: _ChatListTile(
+                      chatRoom: chatRoom,
+                      otherUser: otherUser,
+                      unreadCount: unreadCount,
+                      onTap: () async {
+                        final navigator = Navigator.of(context);
+                        final currentUser = await authService
+                            .getUserData(authService.currentUser!.uid);
+                        if (currentUser != null && mounted) {
+                          navigator.push(
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreen(
+                                otherUser: otherUser,
+                                currentUser: currentUser,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   );
                 },
               );

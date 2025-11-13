@@ -45,19 +45,23 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         String errorMessage = 'Login failed';
 
-        // Parse Firebase errors
+        // Parse Firebase errors and show user-friendly messages
         if (e.toString().contains('CONFIGURATION_NOT_FOUND')) {
           errorMessage = 'Firebase Authentication is not configured. Please enable Email/Password sign-in in Firebase Console.';
         } else if (e.toString().contains('user-not-found')) {
           errorMessage = 'No account found with this email. Please sign up first.';
-        } else if (e.toString().contains('wrong-password')) {
-          errorMessage = 'Incorrect password. Please try again.';
+        } else if (e.toString().contains('wrong-password') || e.toString().contains('invalid-credential')) {
+          errorMessage = 'Wrong password. Please try again or use "Forgot Password?" to reset it.';
         } else if (e.toString().contains('invalid-email')) {
-          errorMessage = 'Invalid email address.';
+          errorMessage = 'Invalid email address. Please check and try again.';
         } else if (e.toString().contains('user-disabled')) {
-          errorMessage = 'This account has been disabled.';
+          errorMessage = 'This account has been disabled. Please contact support.';
+        } else if (e.toString().contains('too-many-requests')) {
+          errorMessage = 'Too many failed attempts. Please try again later or reset your password.';
+        } else if (e.toString().contains('network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection.';
         } else {
-          errorMessage = 'Login failed: ${e.toString()}';
+          errorMessage = 'Login failed. Please check your credentials and try again.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -73,6 +77,133 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signInWithGoogle();
+
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/main');
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Google Sign-In failed';
+
+        if (e.toString().contains('account-exists-with-different-credential')) {
+          errorMessage = 'An account already exists with this email using a different sign-in method.';
+        } else if (e.toString().contains('popup-closed-by-user') || e.toString().contains('cancelled')) {
+          errorMessage = 'Sign-in was cancelled.';
+        } else if (e.toString().contains('network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else {
+          errorMessage = 'Google Sign-In failed. Please try again.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppTheme.coral,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController(text: _emailController.text.trim());
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter your email address and we\'ll send you a link to reset your password.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid email address'),
+                    backgroundColor: AppTheme.coral,
+                  ),
+                );
+                return;
+              }
+
+              if (!context.mounted) return;
+              Navigator.pop(context);
+
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final messenger = ScaffoldMessenger.of(context);
+
+              try {
+                await authService.resetPassword(email);
+
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Password reset email sent to $email'),
+                    backgroundColor: AppTheme.teal,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              } catch (e) {
+                String errorMessage = 'Failed to send reset email';
+
+                if (e.toString().contains('user-not-found')) {
+                  errorMessage = 'No account found with this email address.';
+                } else if (e.toString().contains('invalid-email')) {
+                  errorMessage = 'Invalid email address.';
+                } else {
+                  errorMessage = 'Failed to send reset email: ${e.toString()}';
+                }
+
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(errorMessage),
+                    backgroundColor: AppTheme.coral,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
+            },
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -189,7 +320,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 10),
+
+                  // Forgot password button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _showForgotPasswordDialog,
+                      child: const Text(
+                        'Forgot Password?',
+                        style: TextStyle(
+                          color: AppTheme.primaryBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
 
                   // Sign in button
                   SizedBox(
@@ -207,6 +355,58 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             )
                           : Text(localizations.signIn),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // OR divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OR',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Google Sign In button
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      icon: Image.asset(
+                        'assets/images/google_logo.png',
+                        height: 24,
+                        width: 24,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.g_mobiledata, size: 32);
+                        },
+                      ),
+                      label: const Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
 
@@ -231,73 +431,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 20),
-
-                  // Language selector
-                  _buildLanguageSelector(context),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageSelector(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Language / Langue / Lang',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _languageButton('English', 'en'),
-              _languageButton('Français', 'fr'),
-              _languageButton('Kreyòl', 'ht'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _languageButton(String label, String languageCode) {
-    final currentLocale = Localizations.localeOf(context);
-    final isSelected = currentLocale.languageCode == languageCode;
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: OutlinedButton(
-          onPressed: () {
-            // Change language logic would go here
-            // This requires updating the app's locale
-          },
-          style: OutlinedButton.styleFrom(
-            backgroundColor: isSelected ? AppTheme.primaryBlue : Colors.white,
-            foregroundColor: isSelected ? Colors.white : AppTheme.primaryBlue,
-            side: BorderSide(
-              color: AppTheme.primaryBlue,
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 12),
           ),
         ),
       ),

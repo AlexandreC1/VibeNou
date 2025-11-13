@@ -37,6 +37,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload when user logs in
+    if (_currentUser == null) {
+      _loadCurrentUser();
+    }
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
@@ -44,23 +53,34 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _loadCurrentUser() async {
     final authService = Provider.of<AuthService>(context, listen: false);
+    print('DEBUG: Loading current user. Auth user: ${authService.currentUser?.uid}');
     if (authService.currentUser != null) {
       final user = await authService.getUserData(authService.currentUser!.uid);
-      setState(() {
-        _currentUser = user;
-      });
-      _loadNearbyUsers();
-      _loadSimilarUsers();
+      print('DEBUG: Current user loaded: ${user?.name}, Location: ${user?.location}');
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+        });
+        _loadNearbyUsers();
+        _loadSimilarUsers();
+      }
+    } else {
+      print('DEBUG: No authenticated user found');
     }
   }
 
   Future<void> _loadNearbyUsers() async {
+    print('DEBUG: _loadNearbyUsers called. Current user: ${_currentUser?.name}, Location: ${_currentUser?.location}');
+
     if (_currentUser == null || _currentUser!.location == null) {
+      print('DEBUG: Requesting location permission...');
       // Request location permission
       final position = await _locationService.getCurrentPosition();
       if (position == null) {
+        print('DEBUG: Location permission denied');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.showSnackBar(
             const SnackBar(
               content: Text('Location permission required'),
               backgroundColor: AppTheme.coral,
@@ -69,6 +89,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         }
         return;
       }
+
+      print('DEBUG: Location obtained: ${position.latitude}, ${position.longitude}');
 
       // Update user location
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -80,25 +102,32 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _currentUser = _currentUser?.copyWith(
           location: GeoPoint(position.latitude, position.longitude),
         );
+        print('DEBUG: User location updated in Firestore');
       }
     }
 
-    if (_currentUser?.location == null) return;
+    if (_currentUser?.location == null) {
+      print('DEBUG: Still no location after update, returning');
+      return;
+    }
 
     setState(() => _isLoadingNearby = true);
 
     try {
+      print('DEBUG: Fetching nearby users within 50km...');
       final users = await _userService.getNearbyUsers(
         currentUserId: _currentUser!.uid,
         userLocation: _currentUser!.location!,
         radiusInKm: 50,
       );
 
+      print('DEBUG: Found ${users.length} nearby users');
       setState(() {
         _nearbyUsers = users;
         _isLoadingNearby = false;
       });
     } catch (e) {
+      print('DEBUG: Error loading nearby users: $e');
       setState(() => _isLoadingNearby = false);
     }
   }
@@ -207,12 +236,27 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             );
           }
 
-          return UserCard(
-            user: user,
-            subtitle: distance != null
-                ? '${distance.toStringAsFixed(1)} km away'
-                : user.city ?? '',
-            onTap: () => _showUserProfile(user),
+          // Animate each card with staggered delay
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: Duration(milliseconds: 300 + (index * 100)),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(30 * (1 - value), 0),
+                child: Opacity(
+                  opacity: value,
+                  child: child,
+                ),
+              );
+            },
+            child: UserCard(
+              user: user,
+              subtitle: distance != null
+                  ? '${distance.toStringAsFixed(1)} km away'
+                  : user.city ?? '',
+              onTap: () => _showUserProfile(user),
+            ),
           );
         },
       ),
@@ -260,10 +304,25 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           final user = userWithSimilarity['user'] as UserModel;
           final similarity = userWithSimilarity['similarity'] as double;
 
-          return UserCard(
-            user: user,
-            subtitle: '${similarity.toStringAsFixed(0)}% similar interests',
-            onTap: () => _showUserProfile(user),
+          // Animate each card with staggered delay
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: Duration(milliseconds: 300 + (index * 100)),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(30 * (1 - value), 0),
+                child: Opacity(
+                  opacity: value,
+                  child: child,
+                ),
+              );
+            },
+            child: UserCard(
+              user: user,
+              subtitle: '${similarity.toStringAsFixed(0)}% similar interests',
+              onTap: () => _showUserProfile(user),
+            ),
           );
         },
       ),

@@ -12,7 +12,20 @@
           "package_name": "com.vibenou.vibenou"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "161222852953-uk74encscl73t1fejv3t7u4vjfovd43l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vibenou.vibenou",
+            "certificate_hash": "424171d13150d04b18ac12f33942fd3331b56b91"
+          }
+        },
+        {
+          "client_id": "161222852953-a340277ohdd5vddlvga4auhpk51ai7eg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDXYedN9RWDBdnIQdA00EeDggAgfnonrAI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "161222852953-a340277ohdd5vddlvga4auhpk51ai7eg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "161222852953-eh991uscujc08edql1oqgh5o35hs12cj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.vibenou.vibenou"
+              }
+            }
+          ]
         }
       }
     }

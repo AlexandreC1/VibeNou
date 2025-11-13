@@ -24,10 +24,16 @@ class UserService {
     double radiusInKm = 50,
   }) async {
     try {
+      print('DEBUG UserService: Querying users (excluding $currentUserId)');
+      print('DEBUG UserService: User location: ${userLocation.latitude}, ${userLocation.longitude}');
+      print('DEBUG UserService: Search radius: ${radiusInKm}km');
+
       QuerySnapshot snapshot = await _firestore
           .collection('users')
           .where('uid', isNotEqualTo: currentUserId)
           .get();
+
+      print('DEBUG UserService: Found ${snapshot.docs.length} total users in database');
 
       List<UserModel> allUsers = snapshot.docs
           .map((doc) => UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
@@ -35,6 +41,8 @@ class UserService {
 
       // Filter by distance
       List<UserModel> nearbyUsers = [];
+      int usersWithoutLocation = 0;
+
       for (var user in allUsers) {
         if (user.location != null) {
           double distance = _calculateDistance(
@@ -43,15 +51,22 @@ class UserService {
             user.location!.latitude,
             user.location!.longitude,
           );
+          print('DEBUG UserService: User ${user.name} is ${distance.toStringAsFixed(2)}km away');
           if (distance <= radiusInKm) {
             nearbyUsers.add(user);
+            print('DEBUG UserService: -> Added ${user.name} to nearby users');
           }
+        } else {
+          usersWithoutLocation++;
         }
       }
 
+      print('DEBUG UserService: ${usersWithoutLocation} users without location data');
+      print('DEBUG UserService: Returning ${nearbyUsers.length} nearby users');
+
       return nearbyUsers;
     } catch (e) {
-      print('Error getting nearby users: $e');
+      print('ERROR UserService: Error getting nearby users: $e');
       return [];
     }
   }
@@ -131,6 +146,14 @@ class UserService {
   // Update user location
   Future<void> updateUserLocation(String uid, Position position, {String? city, String? country}) async {
     try {
+      // Check if user document exists first
+      final docSnapshot = await _firestore.collection('users').doc(uid).get();
+
+      if (!docSnapshot.exists) {
+        print('User document not found for uid: $uid. Skipping location update.');
+        return;
+      }
+
       await _firestore.collection('users').doc(uid).update({
         'location': GeoPoint(position.latitude, position.longitude),
         'city': city,
@@ -139,7 +162,7 @@ class UserService {
       });
     } catch (e) {
       print('Error updating location: $e');
-      rethrow;
+      // Don't rethrow - just log the error
     }
   }
 }

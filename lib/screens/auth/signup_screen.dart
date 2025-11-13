@@ -30,7 +30,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   int _currentPage = 0;
 
-  List<String> _selectedInterests = [];
+  final List<String> _selectedInterests = [];
   final List<String> _availableInterests = [
     'Music',
     'Dance',
@@ -81,9 +81,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       // Get user location
       final position = await locationService.getCurrentPosition();
-      GeoPoint? geoPoint;
+      // Location is retrieved for future use
       if (position != null) {
-        geoPoint = GeoPoint(position.latitude, position.longitude);
+        // GeoPoint could be used for location-based features
+        GeoPoint(position.latitude, position.longitude);
       }
 
       await authService.signUp(

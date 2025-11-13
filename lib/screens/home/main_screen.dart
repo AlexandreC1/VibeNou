@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
-import '../../utils/app_theme.dart';
 import 'discover_screen.dart';
 import 'chat_list_screen.dart';
 import 'profile_screen.dart';

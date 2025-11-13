@@ -23,16 +23,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserProfile();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload profile when dependencies change (e.g., after login)
+    _loadUserProfile();
+  }
+
   Future<void> _loadUserProfile() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {
+      setState(() => _isLoading = true);
       final user = await authService.getUserData(authService.currentUser!.uid);
-      setState(() {
-        _currentUser = user;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+          _isLoading = false;
+        });
+      }
     } else {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _currentUser = null;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -82,16 +97,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final localizations = AppLocalizations.of(context)!;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: AppBar(title: Text(localizations.profile)),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_currentUser == null) {
       return Scaffold(
         appBar: AppBar(title: Text(localizations.profile)),
-        body: const Center(
-          child: Text('Please log in to view your profile'),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.person_outline,
+                size: 80,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Please log in to view your profile',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -112,66 +145,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Profile Header
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      _currentUser!.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 48,
-                        color: AppTheme.primaryBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            // Profile Header with animation
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: child,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _currentUser!.name,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_currentUser!.age} years old',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  if (_currentUser!.city != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _currentUser!.city!,
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    Hero(
+                      tag: 'profile_avatar_${_currentUser!.uid}',
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.white,
+                        child: Text(
+                          _currentUser!.name[0].toUpperCase(),
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
+                            fontSize: 48,
+                            color: AppTheme.primaryBlue,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _currentUser!.name,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_currentUser!.age} years old',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    if (_currentUser!.city != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _currentUser!.city!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
 

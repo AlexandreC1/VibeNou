@@ -4,7 +4,6 @@ import '../../l10n/app_localizations.dart';
 import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
 import '../../services/chat_service.dart';
-import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/report_dialog.dart';
 

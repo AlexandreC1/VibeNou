@@ -42,17 +42,12 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _loadLocale() async {
     final prefs = await SharedPreferences.getInstance();
-    final languageCode = prefs.getString('language_code') ?? 'en';
+    // Check for preferred_language from onboarding first, then fall back to language_code
+    final languageCode = prefs.getString('preferred_language') ??
+                        prefs.getString('language_code') ??
+                        'en';
     setState(() {
       _locale = Locale(languageCode);
-    });
-  }
-
-  void _changeLocale(Locale locale) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('language_code', locale.languageCode);
-    setState(() {
-      _locale = locale;
     });
   }
 
@@ -81,6 +76,20 @@ class _MyAppState extends State<MyApp> {
           Locale('fr', ''), // French
           Locale('ht', ''), // Haitian Creole
         ],
+        localeResolutionCallback: (locale, supportedLocales) {
+          // If Haitian Creole is selected, fallback to French for Material widgets
+          if (locale?.languageCode == 'ht') {
+            return const Locale('fr', '');
+          }
+          // Check if the current locale is supported
+          for (var supportedLocale in supportedLocales) {
+            if (supportedLocale.languageCode == locale?.languageCode) {
+              return supportedLocale;
+            }
+          }
+          // Fallback to English
+          return const Locale('en', '');
+        },
         home: const SplashScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),
