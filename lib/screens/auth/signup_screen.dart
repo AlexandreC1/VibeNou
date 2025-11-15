@@ -73,33 +73,63 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    print('Starting signup process...');
     setState(() => _isLoading = true);
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final locationService = LocationService();
 
-      // Get user location
+      // Get user location with timeout (don't block signup on location)
       GeoPoint? geoPoint;
       String? city;
       String? country;
 
-      final position = await locationService.getCurrentPosition();
-      if (position != null) {
-        geoPoint = GeoPoint(position.latitude, position.longitude);
-
-        // Get address from coordinates
-        final address = await locationService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
+      print('Attempting to get location (with 10s timeout)...');
+      try {
+        final position = await locationService.getCurrentPosition().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('Location fetch timed out, continuing without location');
+            return null;
+          },
         );
 
-        if (address != null) {
-          city = address['city'];
-          country = address['country'];
+        if (position != null) {
+          print('Got location: ${position.latitude}, ${position.longitude}');
+          geoPoint = GeoPoint(position.latitude, position.longitude);
+
+          // Get address from coordinates (with timeout)
+          try {
+            final address = await locationService.getAddressFromCoordinates(
+              position.latitude,
+              position.longitude,
+            ).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                print('Geocoding timed out');
+                return null;
+              },
+            );
+
+            if (address != null) {
+              city = address['city'];
+              country = address['country'];
+              print('Geocoded to: $city, $country');
+            }
+          } catch (geocodeError) {
+            print('Geocoding error: $geocodeError');
+            // Continue without city/country
+          }
+        } else {
+          print('Location permission denied or unavailable');
         }
+      } catch (locationError) {
+        print('Location error: $locationError');
+        // Continue without location
       }
 
+      print('Creating account...');
       await authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -112,20 +142,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
         country: country,
       );
 
+      print('Signup successful! Navigating to main screen...');
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } catch (e) {
+      print('ERROR during signup: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sign up failed: ${e.toString()}'),
             backgroundColor: AppTheme.coral,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     } finally {
       if (mounted) {
+        print('Resetting loading state');
         setState(() => _isLoading = false);
       }
     }
