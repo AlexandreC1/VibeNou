@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/profile_view_service.dart';
 import '../../utils/app_theme.dart';
+import '../profile/profile_visitors_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -143,10 +145,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
+    final profileViewService = ProfileViewService();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.profile),
         actions: [
+          // Profile Visitors Button with Badge
+          StreamBuilder<int>(
+            stream: profileViewService.getUnreadViewsCount(
+              Provider.of<AuthService>(context, listen: false).currentUser!.uid,
+            ),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.visibility),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ProfileVisitorsScreen(),
+                        ),
+                      );
+                    },
+                    tooltip: 'Profile Visitors',
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.coral,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {

@@ -6,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../services/location_service.dart';
+import '../../services/profile_view_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/user_card.dart';
 import '../chat/chat_screen.dart';
@@ -358,7 +359,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 }
 
-class _UserProfileSheet extends StatelessWidget {
+class _UserProfileSheet extends StatefulWidget {
   final UserModel user;
   final UserModel? currentUser;
 
@@ -366,6 +367,29 @@ class _UserProfileSheet extends StatelessWidget {
     required this.user,
     required this.currentUser,
   });
+
+  @override
+  State<_UserProfileSheet> createState() => _UserProfileSheetState();
+}
+
+class _UserProfileSheetState extends State<_UserProfileSheet> {
+  final ProfileViewService _profileViewService = ProfileViewService();
+
+  @override
+  void initState() {
+    super.initState();
+    _recordProfileView();
+  }
+
+  Future<void> _recordProfileView() async {
+    if (widget.currentUser != null) {
+      await _profileViewService.recordProfileView(
+        viewerId: widget.currentUser!.uid,
+        viewedUserId: widget.user.uid,
+      );
+      print('Profile view recorded: ${widget.currentUser!.name} viewed ${widget.user.name}');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +427,7 @@ class _UserProfileSheet extends StatelessWidget {
                       radius: 60,
                       backgroundColor: AppTheme.primaryBlue,
                       child: Text(
-                        user.name[0].toUpperCase(),
+                        widget.user.name[0].toUpperCase(),
                         style: const TextStyle(
                           fontSize: 48,
                           color: Colors.white,
@@ -418,7 +442,7 @@ class _UserProfileSheet extends StatelessWidget {
                   // Name and age
                   Center(
                     child: Text(
-                      '${user.name}, ${user.age}',
+                      '${widget.user.name}, ${widget.user.age}',
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
                   ),
@@ -426,7 +450,7 @@ class _UserProfileSheet extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   // Location
-                  if (user.city != null)
+                  if (widget.user.city != null)
                     Center(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -434,7 +458,7 @@ class _UserProfileSheet extends StatelessWidget {
                           const Icon(Icons.location_on, size: 16),
                           const SizedBox(width: 4),
                           Text(
-                            user.city!,
+                            widget.user.city!,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
@@ -450,7 +474,7 @@ class _UserProfileSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    user.bio,
+                    widget.user.bio,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
 
@@ -465,7 +489,7 @@ class _UserProfileSheet extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: user.interests.map((interest) {
+                    children: widget.user.interests.map((interest) {
                       return Chip(
                         label: Text(interest),
                         backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
@@ -484,7 +508,7 @@ class _UserProfileSheet extends StatelessWidget {
                           onPressed: () {
                             Navigator.pop(context);
                             // Report user
-                            _showReportDialog(context, user);
+                            _showReportDialog(context, widget.user);
                           },
                           icon: const Icon(Icons.flag_outlined),
                           label: Text(localizations.reportUser),
@@ -501,13 +525,13 @@ class _UserProfileSheet extends StatelessWidget {
                           onPressed: () {
                             Navigator.pop(context);
                             // Start chat
-                            if (currentUser != null) {
+                            if (widget.currentUser != null) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => ChatScreen(
-                                    otherUser: user,
-                                    currentUser: currentUser!,
+                                    otherUser: widget.user,
+                                    currentUser: widget.currentUser!,
                                   ),
                                 ),
                               );
