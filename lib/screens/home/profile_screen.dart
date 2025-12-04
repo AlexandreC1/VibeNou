@@ -96,19 +96,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Logout'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.coral,
+            ),
           ),
         ],
       ),
     );
 
     if (confirmed == true && mounted) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
+      try {
+        print('Logging out user...');
+        final authService = Provider.of<AuthService>(context, listen: false);
+        await authService.signOut();
+        print('Logout successful, navigating to login screen...');
+
+        if (mounted) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Logged out successfully'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          // Navigate to login screen and clear all previous routes
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/login',
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        print('Logout error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Logout failed: ${e.toString()}'),
+              backgroundColor: AppTheme.coral,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
     }
   }
