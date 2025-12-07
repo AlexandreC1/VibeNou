@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
+import '../../providers/theme_provider.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -29,6 +30,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   int _currentPage = 0;
+  String? _selectedGender;
 
   final List<String> _selectedInterests = [];
   final List<String> _availableInterests = [
@@ -72,11 +74,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
       return;
     }
+    if (_selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your gender'),
+          backgroundColor: AppTheme.coral,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       final locationService = LocationService();
 
       // Get user location
@@ -87,16 +99,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
         GeoPoint(position.latitude, position.longitude);
       }
 
-      await authService.signUp(
+      final user = await authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         name: _nameController.text.trim(),
         age: int.parse(_ageController.text),
         bio: _bioController.text.trim(),
         interests: _selectedInterests,
+        gender: _selectedGender,
       );
 
-      if (mounted) {
+      if (mounted && user != null) {
+        themeProvider.updateTheme(user);
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } catch (e) {
@@ -192,7 +206,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             LinearProgressIndicator(
               value: (_currentPage + 1) / 3,
               backgroundColor: AppTheme.borderColor,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryRose),
             ),
 
             Expanded(
@@ -382,6 +396,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
           const SizedBox(height: 20),
 
+          // Gender Selection
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Gender',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGenderOption(
+                      'Male',
+                      Icons.male,
+                      'male',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildGenderOption(
+                      'Female',
+                      Icons.female,
+                      'female',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
           TextFormField(
             controller: _bioController,
             maxLines: 4,
@@ -401,6 +451,52 @@ class _SignUpScreenState extends State<SignUpScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenderOption(String label, IconData icon, String value) {
+    final isSelected = _selectedGender == value;
+    final Color selectedColor =
+        value == 'male' ? AppTheme.primaryBlue : AppTheme.primaryRose;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedGender = value;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? selectedColor.withValues(alpha: 0.1)
+              : Colors.transparent,
+          border: Border.all(
+            color: isSelected ? selectedColor : AppTheme.borderColor,
+            width: isSelected ? 2 : 1.5,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: isSelected ? selectedColor : AppTheme.textSecondary,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? selectedColor : AppTheme.textSecondary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -439,10 +535,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     }
                   });
                 },
-                selectedColor: AppTheme.primaryBlue.withOpacity(0.2),
-                checkmarkColor: AppTheme.primaryBlue,
+                selectedColor: AppTheme.primaryRose.withValues(alpha: 0.2),
+                checkmarkColor: AppTheme.primaryRose,
                 labelStyle: TextStyle(
-                  color: isSelected ? AppTheme.primaryBlue : AppTheme.textSecondary,
+                  color: isSelected ? AppTheme.primaryRose : AppTheme.textSecondary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               );

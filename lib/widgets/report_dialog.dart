@@ -62,7 +62,7 @@ class _ReportDialogState extends State<ReportDialog> {
             content: Text(
               AppLocalizations.of(context)!.reportSubmitted,
             ),
-            backgroundColor: AppTheme.teal,
+            backgroundColor: AppTheme.royalPurple,
           ),
         );
       }
@@ -183,10 +183,10 @@ class _ReportDialogState extends State<ReportDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryBlue.withOpacity(0.1)
+                ? AppTheme.primaryRose.withValues(alpha: 0.1)
                 : Colors.transparent,
             border: Border.all(
-              color: isSelected ? AppTheme.primaryBlue : AppTheme.borderColor,
+              color: isSelected ? AppTheme.primaryRose : AppTheme.borderColor,
               width: isSelected ? 2 : 1,
             ),
             borderRadius: BorderRadius.circular(8),
@@ -195,7 +195,7 @@ class _ReportDialogState extends State<ReportDialog> {
             children: [
               Icon(
                 icon,
-                color: isSelected ? AppTheme.primaryBlue : AppTheme.textSecondary,
+                color: isSelected ? AppTheme.primaryRose : AppTheme.textSecondary,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -203,7 +203,7 @@ class _ReportDialogState extends State<ReportDialog> {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: isSelected ? AppTheme.primaryBlue : AppTheme.textPrimary,
+                    color: isSelected ? AppTheme.primaryRose : AppTheme.textPrimary,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
@@ -211,7 +211,7 @@ class _ReportDialogState extends State<ReportDialog> {
               if (isSelected)
                 const Icon(
                   Icons.check_circle,
-                  color: AppTheme.primaryBlue,
+                  color: AppTheme.primaryRose,
                   size: 20,
                 ),
             ],

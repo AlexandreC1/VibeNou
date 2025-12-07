@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../l10n/app_localizations.dart';
 import '../../models/chat_message.dart';
@@ -158,14 +159,19 @@ class _ChatListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppTheme.primaryBlue,
-        child: Text(
-          otherUser.name[0].toUpperCase(),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundColor: AppTheme.primaryRose,
+        backgroundImage: otherUser.photoUrl != null
+            ? CachedNetworkImageProvider(otherUser.photoUrl!)
+            : null,
+        child: otherUser.photoUrl == null
+            ? Text(
+                otherUser.name[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
       ),
       title: Text(
         otherUser.name,

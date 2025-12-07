@@ -12,6 +12,7 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_screen.dart';
 import 'services/auth_service.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,13 +59,18 @@ class _MyAppState extends State<MyApp> {
         Provider<AuthService>(
           create: (_) => AuthService(),
         ),
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (_) => ThemeProvider(),
+        ),
         // Add other providers here
       ],
-      child: MaterialApp(
-        title: 'VibeNou',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        locale: _locale,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'VibeNou',
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.currentTheme,
+            locale: _locale,
         localizationsDelegates: const [
           AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
@@ -90,10 +96,12 @@ class _MyAppState extends State<MyApp> {
           // Fallback to English
           return const Locale('en', '');
         },
-        home: const SplashScreen(),
-        routes: {
-          '/login': (context) => const LoginScreen(),
-          '/main': (context) => const MainScreen(),
+            home: const SplashScreen(),
+            routes: {
+              '/login': (context) => const LoginScreen(),
+              '/main': (context) => const MainScreen(),
+            },
+          );
         },
       ),
     );

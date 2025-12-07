@@ -4,9 +4,20 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+  final GoogleSignIn _googleSignIn;
+
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    GoogleSignIn? googleSignIn,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _googleSignIn = googleSignIn ?? GoogleSignIn(
+          // Server/Web Client ID from Firebase Console for better cross-platform support
+          serverClientId: '161222852953-a340277ohdd5vddlvga4auhpk51ai7eg.apps.googleusercontent.com',
+        );
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -23,6 +34,7 @@ class AuthService {
     required String bio,
     required List<String> interests,
     String preferredLanguage = 'en',
+    String? gender,
   }) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -43,6 +55,7 @@ class AuthService {
           createdAt: DateTime.now(),
           lastActive: DateTime.now(),
           preferredLanguage: preferredLanguage,
+          gender: gender,
         );
 
         await _firestore
@@ -65,25 +78,67 @@ class AuthService {
     required String password,
   }) async {
     try {
+      print('DEBUG: Attempting sign in for email: $email');
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       User? user = result.user;
-      if (user != null) {
-        // Update last active
-        await _firestore.collection('users').doc(user.uid).update({
-          'lastActive': FieldValue.serverTimestamp(),
-        });
+      print('DEBUG: Firebase Auth successful. User ID: ${user?.uid}');
 
-        // Get user data
+      if (user != null) {
+        // Check if user document exists
+        print('DEBUG: Checking Firestore for user document...');
         DocumentSnapshot doc =
             await _firestore.collection('users').doc(user.uid).get();
+
+        if (!doc.exists) {
+          print('DEBUG: User document not found. Creating new document with self-healing...');
+          // Self-healing: Create missing profile
+          UserModel userModel = UserModel(
+            uid: user.uid,
+            email: email,
+            name: user.displayName ?? 'User',
+            age: 18,
+            bio: 'Welcome to VibeNou!',
+            interests: [],
+            createdAt: DateTime.now(),
+            lastActive: DateTime.now(),
+            preferredLanguage: 'en',
+          );
+
+          try {
+            await _firestore
+                .collection('users')
+                .doc(user.uid)
+                .set(userModel.toMap());
+            print('DEBUG: Successfully created user document in Firestore');
+          } catch (firestoreError) {
+            print('ERROR: Failed to create Firestore document: $firestoreError');
+            rethrow;
+          }
+
+          return userModel;
+        }
+
+        print('DEBUG: User document found. Updating last active...');
+        // Update last active
+        try {
+          await _firestore.collection('users').doc(user.uid).update({
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+        } catch (updateError) {
+          print('WARNING: Failed to update last active: $updateError');
+          // Continue anyway - not critical
+        }
+
+        print('DEBUG: Returning user model from existing document');
         return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
       }
     } catch (e) {
-      print('Sign in error: $e');
+      print('ERROR: Sign in failed: $e');
+      print('ERROR: Error type: ${e.runtimeType}');
       rethrow;
     }
     return null;
@@ -155,11 +210,24 @@ class AuthService {
   Future<void> signOut() async {
     try {
       if (currentUser != null) {
-        await _firestore.collection('users').doc(currentUser!.uid).update({
-          'lastActive': FieldValue.serverTimestamp(),
-        });
+        try {
+          await _firestore.collection('users').doc(currentUser!.uid).update({
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+        } catch (e) {
+          print('Error updating last active: $e');
+          // Continue with sign out even if this fails
+        }
       }
-      await _googleSignIn.signOut();
+
+      // Only sign out from Google if user signed in with Google
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        print('Google sign out error (user may not be signed in with Google): $e');
+        // Continue with Firebase sign out
+      }
+
       await _auth.signOut();
     } catch (e) {
       print('Sign out error: $e');

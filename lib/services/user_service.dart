@@ -61,7 +61,7 @@ class UserService {
         }
       }
 
-      print('DEBUG UserService: ${usersWithoutLocation} users without location data');
+      print('DEBUG UserService: $usersWithoutLocation users without location data');
       print('DEBUG UserService: Returning ${nearbyUsers.length} nearby users');
 
       return nearbyUsers;

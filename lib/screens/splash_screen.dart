@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
+import '../providers/theme_provider.dart';
+import '../utils/fix_user_profile.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -44,9 +46,22 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
 
     // Check if user is logged in
     if (authService.currentUser != null) {
+      // Try to fix missing profile (temporary debug code)
+      try {
+        await fixCurrentUserProfile();
+      } catch (e) {
+        print('Note: Profile fix attempted: $e');
+      }
+
+      // Load user data and set theme
+      final userData = await authService.getUserData(authService.currentUser!.uid);
+      if (userData != null) {
+        themeProvider.updateTheme(userData);
+      }
       Navigator.of(context).pushReplacementNamed('/main');
     } else {
       Navigator.of(context).pushReplacementNamed('/login');
@@ -64,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: AppTheme.haitianGradient,
+          gradient: AppTheme.primaryGradient,
         ),
         child: Center(
           child: FadeTransition(
@@ -83,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -95,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen>
                         style: TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryBlue,
+                          color: AppTheme.primaryRose,
                         ),
                       ),
                     ),

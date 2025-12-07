@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
+import '../../providers/theme_provider.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -33,12 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signIn(
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final user = await authService.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      if (mounted) {
+      if (user != null && mounted) {
+        themeProvider.updateTheme(user);
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } catch (e) {
@@ -67,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: AppTheme.coral,
+            backgroundColor: AppTheme.primaryRose,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -84,9 +87,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signInWithGoogle();
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final user = await authService.signInWithGoogle();
 
-      if (mounted) {
+      if (user != null && mounted) {
+        themeProvider.updateTheme(user);
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } catch (e) {
@@ -106,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: AppTheme.coral,
+            backgroundColor: AppTheme.primaryRose,
             duration: const Duration(seconds: 4),
           ),
         );
@@ -157,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Please enter a valid email address'),
-                    backgroundColor: AppTheme.coral,
+                    backgroundColor: AppTheme.primaryRose,
                   ),
                 );
                 return;
@@ -175,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text('Password reset email sent to $email'),
-                    backgroundColor: AppTheme.teal,
+                    backgroundColor: AppTheme.royalPurple,
                     duration: const Duration(seconds: 5),
                   ),
                 );
@@ -193,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(errorMessage),
-                    backgroundColor: AppTheme.coral,
+                    backgroundColor: AppTheme.primaryRose,
                     duration: const Duration(seconds: 5),
                   ),
                 );
@@ -231,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primaryBlue.withOpacity(0.3),
+                          color: AppTheme.primaryRose.withValues(alpha: 0.3),
                           blurRadius: 15,
                           offset: const Offset(0, 5),
                         ),
@@ -330,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         'Forgot Password?',
                         style: TextStyle(
-                          color: AppTheme.primaryBlue,
+                          color: AppTheme.primaryRose,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

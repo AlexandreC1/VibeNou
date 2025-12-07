@@ -8,12 +8,15 @@ class UserModel {
   final String bio;
   final List<String> interests;
   final String? photoUrl;
+  final List<String> photos; // Multiple photos for profile gallery
   final GeoPoint? location;
   final String? city;
   final String? country;
   final DateTime createdAt;
   final DateTime lastActive;
   final String preferredLanguage;
+  final bool locationSharingEnabled; // Control whether to share location
+  final String? gender; // 'male' or 'female'
 
   UserModel({
     required this.uid,
@@ -23,12 +26,15 @@ class UserModel {
     required this.bio,
     required this.interests,
     this.photoUrl,
+    this.photos = const [],
     this.location,
     this.city,
     this.country,
     required this.createdAt,
     required this.lastActive,
     this.preferredLanguage = 'en',
+    this.locationSharingEnabled = true,
+    this.gender,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
@@ -40,12 +46,15 @@ class UserModel {
       bio: map['bio'] ?? '',
       interests: List<String>.from(map['interests'] ?? []),
       photoUrl: map['photoUrl'],
+      photos: List<String>.from(map['photos'] ?? []),
       location: map['location'],
       city: map['city'],
       country: map['country'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastActive: (map['lastActive'] as Timestamp?)?.toDate() ?? DateTime.now(),
       preferredLanguage: map['preferredLanguage'] ?? 'en',
+      locationSharingEnabled: map['locationSharingEnabled'] ?? true,
+      gender: map['gender'],
     );
   }
 
@@ -58,12 +67,15 @@ class UserModel {
       'bio': bio,
       'interests': interests,
       'photoUrl': photoUrl,
+      'photos': photos,
       'location': location,
       'city': city,
       'country': country,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastActive': Timestamp.fromDate(lastActive),
       'preferredLanguage': preferredLanguage,
+      'locationSharingEnabled': locationSharingEnabled,
+      'gender': gender,
     };
   }
 
@@ -75,12 +87,15 @@ class UserModel {
     String? bio,
     List<String>? interests,
     String? photoUrl,
+    List<String>? photos,
     GeoPoint? location,
     String? city,
     String? country,
     DateTime? createdAt,
     DateTime? lastActive,
     String? preferredLanguage,
+    bool? locationSharingEnabled,
+    String? gender,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -90,12 +105,15 @@ class UserModel {
       bio: bio ?? this.bio,
       interests: interests ?? this.interests,
       photoUrl: photoUrl ?? this.photoUrl,
+      photos: photos ?? this.photos,
       location: location ?? this.location,
       city: city ?? this.city,
       country: country ?? this.country,
       createdAt: createdAt ?? this.createdAt,
       lastActive: lastActive ?? this.lastActive,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      locationSharingEnabled: locationSharingEnabled ?? this.locationSharingEnabled,
+      gender: gender ?? this.gender,
     );
   }
 }

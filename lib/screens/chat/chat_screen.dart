@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../l10n/app_localizations.dart';
 import '../../models/chat_message.dart';
@@ -97,13 +98,18 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               backgroundColor: Colors.white,
-              child: Text(
-                widget.otherUser.name[0].toUpperCase(),
-                style: const TextStyle(
-                  color: AppTheme.primaryBlue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundImage: widget.otherUser.photoUrl != null
+                  ? CachedNetworkImageProvider(widget.otherUser.photoUrl!)
+                  : null,
+              child: widget.otherUser.photoUrl == null
+                  ? Text(
+                      widget.otherUser.name[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: AppTheme.primaryRose,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -217,7 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -293,7 +299,7 @@ class _MessageBubble extends StatelessWidget {
           if (!isMe) ...[
             const CircleAvatar(
               radius: 16,
-              backgroundColor: AppTheme.primaryBlue,
+              backgroundColor: AppTheme.primaryRose,
               child: Icon(Icons.person, size: 16, color: Colors.white),
             ),
             const SizedBox(width: 8),
