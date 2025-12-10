@@ -64,30 +64,45 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void _filterUsers() {
     final query = _searchController.text.toLowerCase();
     setState(() {
+      // Apply ALL filters: age, search, gender preference, and distance
       _filteredNearbyUsers = _nearbyUsers.where((user) {
-        return user.name.toLowerCase().contains(query) ||
+        // Age filter (use manual filter OR user's preferences)
+        final passesAgeFilter = user.age >= _minAge && user.age <= _maxAge;
+
+        // Search filter (if query is empty, passes by default)
+        final passesSearchFilter = query.isEmpty ||
+            user.name.toLowerCase().contains(query) ||
             user.interests.any((interest) => interest.toLowerCase().contains(query));
+
+        // Gender preference filter
+        final passesGenderFilter = _currentUser?.preferredGender == null ||
+            user.gender == _currentUser?.preferredGender;
+
+        return passesAgeFilter && passesSearchFilter && passesGenderFilter;
       }).toList();
 
       _filteredSimilarUsers = _similarUsers.where((item) {
         final user = item['user'] as UserModel;
-        return user.name.toLowerCase().contains(query) ||
+
+        // Age filter
+        final passesAgeFilter = user.age >= _minAge && user.age <= _maxAge;
+
+        // Search filter
+        final passesSearchFilter = query.isEmpty ||
+            user.name.toLowerCase().contains(query) ||
             user.interests.any((interest) => interest.toLowerCase().contains(query));
+
+        // Gender preference filter
+        final passesGenderFilter = _currentUser?.preferredGender == null ||
+            user.gender == _currentUser?.preferredGender;
+
+        return passesAgeFilter && passesSearchFilter && passesGenderFilter;
       }).toList();
     });
   }
 
   void _applyFilters() {
-    setState(() {
-      _filteredNearbyUsers = _nearbyUsers.where((user) {
-        return user.age >= _minAge && user.age <= _maxAge;
-      }).toList();
-
-      _filteredSimilarUsers = _similarUsers.where((item) {
-        final user = item['user'] as UserModel;
-        return user.age >= _minAge && user.age <= _maxAge;
-      }).toList();
-    });
+    // Just call _filterUsers which now applies both filters
     _filterUsers();
   }
 
@@ -100,6 +115,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       if (mounted) {
         setState(() {
           _currentUser = user;
+          // Initialize filters from user's dating preferences
+          if (user != null) {
+            _minAge = user.preferredAgeMin;
+            _maxAge = user.preferredAgeMax;
+            if (user.preferredMaxDistance != null) {
+              _maxDistance = user.preferredMaxDistance!.toDouble();
+            }
+          }
         });
         _loadNearbyUsers();
         _loadSimilarUsers();

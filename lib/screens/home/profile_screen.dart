@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
@@ -10,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
+import '../../providers/language_provider.dart';
 import '../profile/edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -104,15 +104,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _changeLanguage(String languageCode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('language_code', languageCode);
+    if (!mounted) return;
+
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    await languageProvider.setLocale(languageCode);
+
+    // Update user preference in Firestore
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (authService.currentUser != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(authService.currentUser!.uid)
+            .update({'preferredLanguage': languageCode});
+      } catch (e) {
+        print('Error updating language preference: $e');
+      }
+    }
+
     if (mounted) {
-      // Restart app or update locale
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Language updated. Please restart the app.'),
+        SnackBar(
+          content: Text('Language updated to ${_getLanguageName(languageCode)}'),
+          backgroundColor: AppTheme.royalPurple,
+          duration: const Duration(seconds: 2),
         ),
       );
+    }
+  }
+
+  String _getLanguageName(String code) {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'fr':
+        return 'Français';
+      case 'ht':
+        return 'Kreyòl Ayisyen';
+      default:
+        return code;
     }
   }
 
@@ -601,19 +631,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
-  }
-
-  String _getLanguageName(String code) {
-    switch (code) {
-      case 'en':
-        return 'English';
-      case 'fr':
-        return 'Français';
-      case 'ht':
-        return 'Kreyòl Ayisyen';
-      default:
-        return 'English';
-    }
   }
 
   void _showLanguageSelector() {

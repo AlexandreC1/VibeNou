@@ -18,6 +18,12 @@ class UserModel {
   final bool locationSharingEnabled; // Control whether to share location
   final String? gender; // 'male' or 'female'
 
+  // Dating preferences
+  final int preferredAgeMin; // Minimum age looking for
+  final int preferredAgeMax; // Maximum age looking for
+  final String? preferredGender; // Gender preference: 'male', 'female', or null for any
+  final int? preferredMaxDistance; // Max distance in km, null for any distance
+
   UserModel({
     required this.uid,
     required this.email,
@@ -35,6 +41,10 @@ class UserModel {
     this.preferredLanguage = 'en',
     this.locationSharingEnabled = true,
     this.gender,
+    this.preferredAgeMin = 18,
+    this.preferredAgeMax = 100,
+    this.preferredGender,
+    this.preferredMaxDistance,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
@@ -55,6 +65,10 @@ class UserModel {
       preferredLanguage: map['preferredLanguage'] ?? 'en',
       locationSharingEnabled: map['locationSharingEnabled'] ?? true,
       gender: map['gender'],
+      preferredAgeMin: map['preferredAgeMin'] ?? 18,
+      preferredAgeMax: map['preferredAgeMax'] ?? 100,
+      preferredGender: map['preferredGender'],
+      preferredMaxDistance: map['preferredMaxDistance'],
     );
   }
 
@@ -76,6 +90,10 @@ class UserModel {
       'preferredLanguage': preferredLanguage,
       'locationSharingEnabled': locationSharingEnabled,
       'gender': gender,
+      'preferredAgeMin': preferredAgeMin,
+      'preferredAgeMax': preferredAgeMax,
+      'preferredGender': preferredGender,
+      'preferredMaxDistance': preferredMaxDistance,
     };
   }
 
@@ -96,6 +114,10 @@ class UserModel {
     String? preferredLanguage,
     bool? locationSharingEnabled,
     String? gender,
+    int? preferredAgeMin,
+    int? preferredAgeMax,
+    String? preferredGender,
+    int? preferredMaxDistance,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -114,6 +136,10 @@ class UserModel {
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       locationSharingEnabled: locationSharingEnabled ?? this.locationSharingEnabled,
       gender: gender ?? this.gender,
+      preferredAgeMin: preferredAgeMin ?? this.preferredAgeMin,
+      preferredAgeMax: preferredAgeMax ?? this.preferredAgeMax,
+      preferredGender: preferredGender ?? this.preferredGender,
+      preferredMaxDistance: preferredMaxDistance ?? this.preferredMaxDistance,
     );
   }
 }

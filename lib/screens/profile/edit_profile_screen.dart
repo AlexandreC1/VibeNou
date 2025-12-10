@@ -62,10 +62,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   bool _locationSharingEnabled = true;
   final int _maxPhotos = 6;
 
+  // Dating preferences
+  int _preferredAgeMin = 18;
+  int _preferredAgeMax = 100;
+  String? _preferredGender; // 'male', 'female', or null for any
+  int? _preferredMaxDistance; // in km
+  String? _selectedGender; // User's own gender
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _nameController = TextEditingController(text: widget.currentUser.name);
     _bioController = TextEditingController(text: widget.currentUser.bio);
     _ageController = TextEditingController(text: widget.currentUser.age.toString());
@@ -73,6 +80,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     _photoUrl = widget.currentUser.photoUrl;
     _photos = List.from(widget.currentUser.photos);
     _locationSharingEnabled = widget.currentUser.locationSharingEnabled;
+
+    // Initialize dating preferences
+    _preferredAgeMin = widget.currentUser.preferredAgeMin;
+    _preferredAgeMax = widget.currentUser.preferredAgeMax;
+    _preferredGender = widget.currentUser.preferredGender;
+    _preferredMaxDistance = widget.currentUser.preferredMaxDistance;
+    _selectedGender = widget.currentUser.gender;
   }
 
   @override
@@ -253,6 +267,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
         photoUrl: _photoUrl,
         photos: uploadedPhotoUrls,
         locationSharingEnabled: _locationSharingEnabled,
+        gender: _selectedGender,
+        preferredAgeMin: _preferredAgeMin,
+        preferredAgeMax: _preferredAgeMax,
+        preferredGender: _preferredGender,
+        preferredMaxDistance: _preferredMaxDistance,
       );
 
       await authService.updateUserProfile(updatedUser);
@@ -291,10 +310,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
         title: const Text('Edit Profile'),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.person), text: 'Basic'),
             Tab(icon: Icon(Icons.favorite), text: 'Interests'),
             Tab(icon: Icon(Icons.photo_library), text: 'Photos'),
+            Tab(icon: Icon(Icons.tune), text: 'Preferences'),
           ],
         ),
         actions: [
@@ -326,6 +347,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           _buildBasicInfoTab(localizations),
           _buildInterestsTab(localizations),
           _buildPhotosTab(localizations),
+          _buildPreferencesTab(localizations),
         ],
       ),
     );
@@ -486,6 +508,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                         return 'Please enter a valid age (18-100)';
                       }
                       return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  DropdownButtonFormField<String>(
+                    value: _selectedGender,
+                    decoration: const InputDecoration(
+                      labelText: 'Gender',
+                      prefixIcon: Icon(Icons.person_outline),
+                      helperText: 'Your gender',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'male', child: Text('Male')),
+                      DropdownMenuItem(value: 'female', child: Text('Female')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedGender = value;
+                      });
                     },
                   ),
 
@@ -877,6 +919,299 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           ],
         );
       },
+    );
+  }
+
+  Widget _buildPreferencesTab(AppLocalizations localizations) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Dating Preferences',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Set your preferences to find better matches',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Age Range Preference
+          Text(
+            'Preferred Age Range',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ages $_preferredAgeMin - $_preferredAgeMax',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.royalPurple,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Min Age Slider
+          Row(
+            children: [
+              const Icon(Icons.cake_outlined, color: AppTheme.primaryRose, size: 20),
+              const SizedBox(width: 12),
+              const Text('Min Age:', style: TextStyle(fontWeight: FontWeight.w500)),
+              const Spacer(),
+              Text(
+                '$_preferredAgeMin years',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.deepPink,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: _preferredAgeMin.toDouble(),
+            min: 18,
+            max: 100,
+            divisions: 82,
+            activeColor: AppTheme.primaryRose,
+            onChanged: (value) {
+              setState(() {
+                _preferredAgeMin = value.toInt();
+                if (_preferredAgeMin > _preferredAgeMax) {
+                  _preferredAgeMax = _preferredAgeMin;
+                }
+              });
+            },
+          ),
+
+          const SizedBox(height: 16),
+
+          // Max Age Slider
+          Row(
+            children: [
+              const Icon(Icons.cake_outlined, color: AppTheme.primaryRose, size: 20),
+              const SizedBox(width: 12),
+              const Text('Max Age:', style: TextStyle(fontWeight: FontWeight.w500)),
+              const Spacer(),
+              Text(
+                '$_preferredAgeMax years',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.deepPink,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: _preferredAgeMax.toDouble(),
+            min: 18,
+            max: 100,
+            divisions: 82,
+            activeColor: AppTheme.primaryRose,
+            onChanged: (value) {
+              setState(() {
+                _preferredAgeMax = value.toInt();
+                if (_preferredAgeMax < _preferredAgeMin) {
+                  _preferredAgeMin = _preferredAgeMax;
+                }
+              });
+            },
+          ),
+
+          const SizedBox(height: 32),
+
+          // Gender Preference
+          Text(
+            'Looking For',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.borderColor),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                RadioListTile<String?>(
+                  title: const Text('Everyone'),
+                  subtitle: const Text('Show all genders'),
+                  value: null,
+                  groupValue: _preferredGender,
+                  activeColor: AppTheme.primaryRose,
+                  onChanged: (value) {
+                    setState(() {
+                      _preferredGender = value;
+                    });
+                  },
+                ),
+                const Divider(height: 1),
+                RadioListTile<String?>(
+                  title: const Text('Men'),
+                  subtitle: const Text('Show only men'),
+                  value: 'male',
+                  groupValue: _preferredGender,
+                  activeColor: AppTheme.primaryRose,
+                  onChanged: (value) {
+                    setState(() {
+                      _preferredGender = value;
+                    });
+                  },
+                ),
+                const Divider(height: 1),
+                RadioListTile<String?>(
+                  title: const Text('Women'),
+                  subtitle: const Text('Show only women'),
+                  value: 'female',
+                  groupValue: _preferredGender,
+                  activeColor: AppTheme.primaryRose,
+                  onChanged: (value) {
+                    setState(() {
+                      _preferredGender = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Distance Preference
+          Text(
+            'Maximum Distance',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.borderColor),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Limit by Distance'),
+                  subtitle: Text(
+                    _preferredMaxDistance == null
+                        ? 'Show users of any distance'
+                        : 'Show users within $_preferredMaxDistance km',
+                  ),
+                  value: _preferredMaxDistance != null,
+                  activeTrackColor: AppTheme.primaryRose.withOpacity(0.5),
+                  activeThumbColor: AppTheme.primaryRose,
+                  onChanged: (value) {
+                    setState(() {
+                      _preferredMaxDistance = value ? 50 : null;
+                    });
+                  },
+                ),
+                if (_preferredMaxDistance != null) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, color: AppTheme.primaryRose, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Distance:', style: TextStyle(fontWeight: FontWeight.w500)),
+                            const Spacer(),
+                            Text(
+                              '${_preferredMaxDistance} km',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.deepPink,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: _preferredMaxDistance!.toDouble(),
+                          min: 1,
+                          max: 500,
+                          divisions: 99,
+                          activeColor: AppTheme.primaryRose,
+                          onChanged: (value) {
+                            setState(() {
+                              _preferredMaxDistance = value.toInt();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Info Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.softPink,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primaryRose.withOpacity(0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: AppTheme.deepPink,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'How Preferences Work',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.deepPink,
+                          fontSize: 15,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'These preferences help filter who you see in the Discover tab. Users who match your criteria will appear in your feed.',
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 40),
+        ],
+      ),
     );
   }
 }
