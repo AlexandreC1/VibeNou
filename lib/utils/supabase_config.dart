@@ -10,10 +10,10 @@
 
 class SupabaseConfig {
   // Replace with your Supabase project URL
-  static const String supabaseUrl = 'YOUR_SUPABASE_URL';
+  static const String supabaseUrl = 'https://iuqemwkjphidljtzbfoc.supabase.co';
 
   // Replace with your Supabase anon/public key
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1cWVtd2tqcGhpZGxqdHpiZm9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyMTYwOTMsImV4cCI6MjA4MDc5MjA5M30.wKFnW0xbmFCi4_-D1179yce3apPy_fM-ywGimVYHjDg';
 
   // Storage bucket name for profile pictures
   static const String profileBucket = 'vibenou-profiles';

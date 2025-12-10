@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../models/profile_view_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_view_service.dart';
+import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
 import '../profile/edit_profile_screen.dart';
 
@@ -111,6 +113,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
           content: Text('Language updated. Please restart the app.'),
         ),
       );
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    if (_currentUser == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Location'),
+        content: const Text(
+          'This will update your location using your current GPS position. '
+          'Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Getting your location...'),
+            ],
+          ),
+          duration: Duration(seconds: 10),
+        ),
+      );
+
+      final locationService = LocationService();
+      final position = await locationService.getCurrentPosition();
+
+      if (position == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to get location. Please enable location services.'),
+              backgroundColor: AppTheme.coral,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get city name from coordinates
+      final addressData = await locationService.getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      final city = addressData?['city'] ?? 'Unknown';
+
+      // Update Firestore
+      if (!mounted) return;
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(authService.currentUser!.uid)
+          .update({
+        'location': GeoPoint(position.latitude, position.longitude),
+        'city': city,
+      });
+
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Location updated to: $city'),
+            backgroundColor: AppTheme.royalPurple,
+          ),
+        );
+
+        // Reload profile to show new location
+        _loadUserProfile();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating location: $e'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
     }
   }
 
@@ -490,9 +593,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: Text(localizations.location),
                   subtitle: Text(_currentUser!.city ?? 'Not set'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    // Update location
-                  },
+                  onTap: _updateLocation,
                 ),
               ],
             ),
@@ -520,43 +621,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'en',
-              groupValue: _currentUser!.preferredLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Français'),
-              value: 'fr',
-              groupValue: _currentUser!.preferredLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Kreyòl Ayisyen'),
-              value: 'ht',
-              groupValue: _currentUser!.preferredLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-          ],
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            String selectedLanguage = _currentUser!.preferredLanguage;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String>(
+                  title: const Text('English'),
+                  value: 'en',
+                  selected: selectedLanguage == 'en',
+                  onChanged: (value) {
+                    if (value != null) {
+                      _changeLanguage(value);
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Français'),
+                  value: 'fr',
+                  selected: selectedLanguage == 'fr',
+                  onChanged: (value) {
+                    if (value != null) {
+                      _changeLanguage(value);
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Kreyòl Ayisyen'),
+                  value: 'ht',
+                  selected: selectedLanguage == 'ht',
+                  onChanged: (value) {
+                    if (value != null) {
+                      _changeLanguage(value);
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

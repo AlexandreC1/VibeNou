@@ -1,9 +1,8 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -57,7 +56,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
 
   String? _photoUrl;
   List<String> _photos = [];
-  final List<File> _newPhotoFiles = [];
+  final List<XFile> _newPhotoFiles = [];
   bool _isLoading = false;
   bool _isUploadingImage = false;
   bool _locationSharingEnabled = true;
@@ -534,7 +533,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                             'Allow others to see your approximate location',
                           ),
                           value: _locationSharingEnabled,
-                          activeColor: AppTheme.primaryRose,
+                          activeTrackColor: AppTheme.primaryRose.withOpacity(0.5),
+                          activeThumbColor: AppTheme.primaryRose,
                           onChanged: (value) {
                             setState(() {
                               _locationSharingEnabled = value;
@@ -804,25 +804,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     );
   }
 
-  Widget _buildNewPhotoTile(File file, int index) {
-    return Stack(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            image: DecorationImage(
-              image: FileImage(file),
-              fit: BoxFit.cover,
+  Widget _buildNewPhotoTile(XFile file, int index) {
+    return FutureBuilder<Uint8List>(
+      future: file.readAsBytes(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey[300],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                image: DecorationImage(
+                  image: MemoryImage(snapshot.data!),
+                  fit: BoxFit.cover,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
         Positioned(
           top: 4,
           right: 4,
@@ -842,26 +855,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
             ),
           ),
         ),
-        Positioned(
-          bottom: 4,
-          left: 4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppTheme.royalPurple,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'New',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.royalPurple,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'New',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

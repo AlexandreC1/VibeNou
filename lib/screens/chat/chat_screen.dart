@@ -25,7 +25,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
-  late String _chatRoomId;
+  String? _chatRoomId;
   bool _isSending = false;
 
   @override
@@ -35,12 +35,38 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initChat() async {
-    _chatRoomId = await _chatService.createChatRoom(
-      widget.currentUser.uid,
-      widget.otherUser.uid,
-    );
-    // Mark messages as read
-    await _chatService.markAsRead(_chatRoomId, widget.currentUser.uid);
+    try {
+      final chatRoomId = await _chatService.createChatRoom(
+        widget.currentUser.uid,
+        widget.otherUser.uid,
+      );
+      if (mounted) {
+        setState(() {
+          _chatRoomId = chatRoomId;
+        });
+      }
+      // Mark messages as read
+      await _chatService.markAsRead(chatRoomId, widget.currentUser.uid);
+    } catch (e) {
+      print('ERROR initializing chat: $e');
+      if (mounted) {
+        // Still set chat room ID to show UI even if mark as read fails
+        final chatRoomId = _chatService.getChatRoomId(
+          widget.currentUser.uid,
+          widget.otherUser.uid,
+        );
+        setState(() {
+          _chatRoomId = chatRoomId;
+        });
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Chat initialization warning: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -50,7 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (_messageController.text.trim().isEmpty || _chatRoomId == null) return;
 
     final message = _messageController.text.trim();
     _messageController.clear();
@@ -59,7 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       await _chatService.sendMessage(
-        chatRoomId: _chatRoomId,
+        chatRoomId: _chatRoomId!,
         senderId: widget.currentUser.uid,
         receiverId: widget.otherUser.uid,
         message: message,
@@ -152,11 +178,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: _chatRoomId == null
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: _chatService.getMessages(_chatRoomId),
+              stream: _chatService.getMessages(_chatRoomId!),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());

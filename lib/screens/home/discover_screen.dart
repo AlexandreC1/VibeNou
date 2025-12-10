@@ -133,15 +133,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       print('DEBUG: Location obtained: ${position.latitude}, ${position.longitude}');
 
       // Update user location
+      if (!mounted) return;
       final authService = Provider.of<AuthService>(context, listen: false);
       if (authService.currentUser != null) {
         await _userService.updateUserLocation(
           authService.currentUser!.uid,
           position,
         );
-        _currentUser = _currentUser?.copyWith(
-          location: GeoPoint(position.latitude, position.longitude),
-        );
+        if (mounted) {
+          setState(() {
+            _currentUser = _currentUser?.copyWith(
+              location: GeoPoint(position.latitude, position.longitude),
+            );
+          });
+        }
         print('DEBUG: User location updated in Firestore');
       }
     }
@@ -1292,20 +1297,20 @@ class _UserProfileSheet extends StatelessWidget {
                             ],
                           ),
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              if (currentUser != null) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ChatScreen(
-                                      otherUser: user,
-                                      currentUser: currentUser!,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
+                            onPressed: currentUser == null
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatScreen(
+                                          otherUser: user,
+                                          currentUser: currentUser!,
+                                        ),
+                                      ),
+                                    );
+                                  },
                             icon: const Icon(Icons.chat_bubble, size: 20),
                             label: Text(
                               localizations.startChat,

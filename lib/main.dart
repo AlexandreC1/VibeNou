@@ -4,10 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'utils/firebase_options.dart';
+import 'utils/supabase_config.dart';
 
 import 'l10n/app_localizations.dart';
-import 'utils/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/main_screen.dart';
@@ -21,6 +22,23 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Supabase (only if configured)
+  try {
+    if (SupabaseConfig.supabaseUrl != 'YOUR_SUPABASE_URL' &&
+        SupabaseConfig.supabaseAnonKey != 'YOUR_SUPABASE_ANON_KEY') {
+      await Supabase.initialize(
+        url: SupabaseConfig.supabaseUrl,
+        anonKey: SupabaseConfig.supabaseAnonKey,
+      );
+      print('✅ Supabase initialized successfully');
+    } else {
+      print('⚠️ Supabase not configured. Image uploads will use Firebase Storage instead.');
+    }
+  } catch (e) {
+    print('⚠️ Supabase initialization failed: $e');
+    print('   Image uploads will use Firebase Storage instead.');
+  }
 
   runApp(const MyApp());
 }

@@ -55,5 +55,18 @@
 	<string>We need your location to show you nearby users and connect you with people in your area.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to show you nearby users and connect you with people in your area.</string>
+
+	<!-- Google Sign-In URL Scheme -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.161222852953-eh991uscujc08edql1oqgh5o35hs12cj</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

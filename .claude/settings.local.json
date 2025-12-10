@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gradlew signingReport:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter pub outdated:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(flutter run)",
+      "Bash(flutter emulators:*)",
+      "Bash(flutter run:*)",
+      "Bash(nc:*)",
+      "Bash(flutter devices:*)",
+      "Bash(git push:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(cat:*)",
+      "Bash(./gradlew clean:*)",
+      "Bash(flutter clean:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

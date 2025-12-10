@@ -13,17 +13,25 @@ class ProfileViewService {
     if (viewerId == viewedUserId) return;
 
     try {
-      // Check if this user already viewed this profile recently (within last hour)
+      // Simplified query - fetch all viewer's views, then filter in memory
+      // This avoids the need for a composite index
       final recentViews = await _firestore
           .collection('profileViews')
           .where('viewerId', isEqualTo: viewerId)
           .where('viewedUserId', isEqualTo: viewedUserId)
-          .orderBy('viewedAt', descending: true)
-          .limit(1)
+          .limit(10)
           .get();
 
       if (recentViews.docs.isNotEmpty) {
-        final lastView = recentViews.docs.first.data();
+        // Find the most recent view by sorting in memory
+        final sortedDocs = recentViews.docs.toList()
+          ..sort((a, b) {
+            final aTime = (a.data()['viewedAt'] as Timestamp).toDate();
+            final bTime = (b.data()['viewedAt'] as Timestamp).toDate();
+            return bTime.compareTo(aTime); // Descending order
+          });
+
+        final lastView = sortedDocs.first.data();
         final lastViewTime = (lastView['viewedAt'] as Timestamp).toDate();
         final timeDifference = DateTime.now().difference(lastViewTime);
 
@@ -58,13 +66,18 @@ class ProfileViewService {
     return _firestore
         .collection('profileViews')
         .where('viewedUserId', isEqualTo: userId)
-        .orderBy('viewedAt', descending: true)
         .limit(50)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      // Sort in memory to avoid index requirement
+      final views = snapshot.docs
           .map((doc) => ProfileView.fromMap(doc.data(), doc.id))
           .toList();
+
+      // Sort by viewedAt in descending order
+      views.sort((a, b) => b.viewedAt.compareTo(a.viewedAt));
+
+      return views;
     });
   }
 

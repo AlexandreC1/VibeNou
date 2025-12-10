@@ -62,9 +62,13 @@ class _SplashScreenState extends State<SplashScreen>
       if (userData != null) {
         themeProvider.updateTheme(userData);
       }
-      Navigator.of(context).pushReplacementNamed('/main');
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/main');
+      }
     } else {
-      Navigator.of(context).pushReplacementNamed('/login');
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
     }
   }
 
