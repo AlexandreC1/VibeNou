@@ -16,7 +16,12 @@
       "Bash(flutter pub get:*)",
       "Bash(cat:*)",
       "Bash(./gradlew clean:*)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(timeout /t 15 /nobreak)",
+      "Bash(java -version:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npx firebase deploy:*)",
+      "Bash(firebase projects:list:*)"
     ],
     "deny": [],
     "ask": []

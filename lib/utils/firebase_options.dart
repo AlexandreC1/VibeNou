@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import '../config/env_config.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -46,29 +47,29 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDXYedN9RWDBdnIQdA00EeDggAgfnonrAI',
-    appId: '1:161222852953:android:59c904d713b999ba890c48',
-    messagingSenderId: '161222852953',
-    projectId: 'vibenou-5d701',
-    storageBucket: 'vibenou-5d701.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKeyAndroid,
+    appId: EnvConfig.firebaseAppIdAndroid,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAyUfdAfuwF4UtfFCaHVuV9rcL4iL4zFDs',
-    appId: '1:161222852953:ios:0b12d1ef1932b1f5890c48',
-    messagingSenderId: '161222852953',
-    projectId: 'vibenou-5d701',
-    storageBucket: 'vibenou-5d701.firebasestorage.app',
-    iosBundleId: 'com.vibenou.vibenou',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKeyIos,
+    appId: EnvConfig.firebaseAppIdIos,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
+    iosBundleId: EnvConfig.firebaseIosBundleId,
   );
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCm4M3jeSw4E54FGQoAaI6q5BvQtMf54ls',
-    authDomain: 'vibenou-5d701.firebaseapp.com',
-    projectId: 'vibenou-5d701',
-    storageBucket: 'vibenou-5d701.firebasestorage.app',
-    messagingSenderId: '161222852953',
-    appId: '1:161222852953:web:d8c69996270b0a63890c48',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKeyWeb,
+    authDomain: EnvConfig.firebaseAuthDomain,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    appId: EnvConfig.firebaseAppIdWeb,
   );
 }

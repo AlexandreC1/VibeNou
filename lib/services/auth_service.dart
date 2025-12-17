@@ -2,6 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
+import '../config/env_config.dart';
+import '../utils/app_logger.dart';
+import 'encryption_service.dart';
+import 'key_storage_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth;
@@ -15,8 +19,8 @@ class AuthService {
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
         _googleSignIn = googleSignIn ?? GoogleSignIn(
-          // Server/Web Client ID from Firebase Console for better cross-platform support
-          serverClientId: '161222852953-a340277ohdd5vddlvga4auhpk51ai7eg.apps.googleusercontent.com',
+          // Server/Web Client ID from environment variables
+          serverClientId: EnvConfig.googleServerClientId,
         );
 
   // Get current user
@@ -44,6 +48,22 @@ class AuthService {
 
       User? user = result.user;
       if (user != null) {
+        // Generate encryption keys for end-to-end encrypted chat
+        String? publicKey;
+        try {
+          final keyPair = await EncryptionService.generateUserKeyPair();
+          publicKey = keyPair['publicKey'];
+
+          // Store private key securely on device
+          final keyStorage = KeyStorageService();
+          await keyStorage.storePrivateKey(user.uid, keyPair['privateKey']!);
+
+          AppLogger.info('Generated encryption keys for user ${user.uid}');
+        } catch (e) {
+          AppLogger.warning('Failed to generate encryption keys, user will have unencrypted chat: $e');
+          // Continue without encryption - not critical for signup
+        }
+
         // Create user profile in Firestore
         UserModel userModel = UserModel(
           uid: user.uid,
@@ -56,6 +76,7 @@ class AuthService {
           lastActive: DateTime.now(),
           preferredLanguage: preferredLanguage,
           gender: gender,
+          publicKey: publicKey, // Store public key in Firestore
         );
 
         await _firestore
@@ -66,7 +87,7 @@ class AuthService {
         return userModel;
       }
     } catch (e) {
-      print('Sign up error: $e');
+      AppLogger.error('Sign up error', e);
       rethrow;
     }
     return null;

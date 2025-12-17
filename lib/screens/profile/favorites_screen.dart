@@ -112,7 +112,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
                   return UserCard(
                     user: user,
-                    currentUserId: authService.currentUser!.uid,
                     onTap: () {
                       Navigator.pushNamed(
                         context,

@@ -7,6 +7,7 @@ import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/user_cache_service.dart';
 import '../../utils/app_theme.dart';
 import '../chat/chat_screen.dart';
 
@@ -19,6 +20,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
+  final UserCacheService _userCache = UserCacheService();
 
   @override
   Widget build(BuildContext context) {
@@ -77,22 +79,51 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
-          return ListView.builder(
-            itemCount: chatRooms.length,
-            itemBuilder: (context, index) {
-              final chatRoom = chatRooms[index];
-              final otherUserId = chatRoom.participants.firstWhere(
-                (id) => id != authService.currentUser!.uid,
-              );
+          // Extract all other user IDs from chat rooms
+          final otherUserIds = chatRooms
+              .map((room) => room.participants.firstWhere(
+                    (id) => id != authService.currentUser!.uid,
+                  ))
+              .toList();
 
-              return FutureBuilder<UserModel?>(
-                future: authService.getUserData(otherUserId),
-                builder: (context, userSnapshot) {
-                  if (!userSnapshot.hasData) {
+          // Also cache current user to avoid duplicate fetch
+          final allUserIds = [authService.currentUser!.uid, ...otherUserIds];
+
+          // Batch fetch all users at once (N+1 problem solved!)
+          return FutureBuilder<Map<String, UserModel>>(
+            future: _userCache.batchGetUsers(allUserIds),
+            builder: (context, userMapSnapshot) {
+              if (userMapSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (userMapSnapshot.hasError) {
+                return Center(
+                  child: Text('Error loading users: ${userMapSnapshot.error}'),
+                );
+              }
+
+              final userMap = userMapSnapshot.data ?? {};
+              final currentUser = userMap[authService.currentUser!.uid];
+
+              if (currentUser == null) {
+                return const Center(child: Text('Error loading current user'));
+              }
+
+              return ListView.builder(
+                itemCount: chatRooms.length,
+                itemBuilder: (context, index) {
+                  final chatRoom = chatRooms[index];
+                  final otherUserId = chatRoom.participants.firstWhere(
+                    (id) => id != authService.currentUser!.uid,
+                  );
+
+                  final otherUser = userMap[otherUserId];
+
+                  if (otherUser == null) {
                     return const SizedBox.shrink();
                   }
 
-                  final otherUser = userSnapshot.data!;
                   final unreadCount =
                       chatRoom.unreadCount[authService.currentUser!.uid] ?? 0;
 
@@ -115,12 +146,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       chatRoom: chatRoom,
                       otherUser: otherUser,
                       unreadCount: unreadCount,
-                      onTap: () async {
-                        final navigator = Navigator.of(context);
-                        final currentUser = await authService
-                            .getUserData(authService.currentUser!.uid);
-                        if (currentUser != null && mounted) {
-                          navigator.push(
+                      onTap: () {
+                        if (mounted) {
+                          Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => ChatScreen(
                                 otherUser: otherUser,

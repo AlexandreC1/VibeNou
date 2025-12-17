@@ -24,6 +24,10 @@ class UserModel {
   final String? preferredGender; // Gender preference: 'male', 'female', or null for any
   final int? preferredMaxDistance; // Max distance in km, null for any distance
 
+  // Encryption keys for end-to-end encrypted chat
+  final String? publicKey; // RSA public key in PEM format (stored in Firestore)
+  final String? encryptedPrivateKey; // Private key encrypted with password (future use)
+
   UserModel({
     required this.uid,
     required this.email,
@@ -45,6 +49,8 @@ class UserModel {
     this.preferredAgeMax = 100,
     this.preferredGender,
     this.preferredMaxDistance,
+    this.publicKey,
+    this.encryptedPrivateKey,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
@@ -69,6 +75,8 @@ class UserModel {
       preferredAgeMax: map['preferredAgeMax'] ?? 100,
       preferredGender: map['preferredGender'],
       preferredMaxDistance: map['preferredMaxDistance'],
+      publicKey: map['publicKey'],
+      encryptedPrivateKey: map['encryptedPrivateKey'],
     );
   }
 
@@ -94,6 +102,8 @@ class UserModel {
       'preferredAgeMax': preferredAgeMax,
       'preferredGender': preferredGender,
       'preferredMaxDistance': preferredMaxDistance,
+      'publicKey': publicKey,
+      'encryptedPrivateKey': encryptedPrivateKey,
     };
   }
 
@@ -118,6 +128,8 @@ class UserModel {
     int? preferredAgeMax,
     String? preferredGender,
     int? preferredMaxDistance,
+    String? publicKey,
+    String? encryptedPrivateKey,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -140,6 +152,8 @@ class UserModel {
       preferredAgeMax: preferredAgeMax ?? this.preferredAgeMax,
       preferredGender: preferredGender ?? this.preferredGender,
       preferredMaxDistance: preferredMaxDistance ?? this.preferredMaxDistance,
+      publicKey: publicKey ?? this.publicKey,
+      encryptedPrivateKey: encryptedPrivateKey ?? this.encryptedPrivateKey,
     );
   }
 }

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'utils/firebase_options.dart';
 import 'utils/supabase_config.dart';
+import 'utils/app_logger.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
@@ -18,6 +20,9 @@ import 'providers/language_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // Initialize Firebase
   await Firebase.initializeApp(
@@ -32,13 +37,13 @@ void main() async {
         url: SupabaseConfig.supabaseUrl,
         anonKey: SupabaseConfig.supabaseAnonKey,
       );
-      print('✅ Supabase initialized successfully');
+      AppLogger.info('Supabase initialized successfully');
     } else {
-      print('⚠️ Supabase not configured. Image uploads will use Firebase Storage instead.');
+      AppLogger.warning('Supabase not configured. Image uploads will use Firebase Storage instead.');
     }
   } catch (e) {
-    print('⚠️ Supabase initialization failed: $e');
-    print('   Image uploads will use Firebase Storage instead.');
+    AppLogger.warning('Supabase initialization failed: $e');
+    AppLogger.info('Image uploads will use Firebase Storage instead.');
   }
 
   runApp(const MyApp());
