@@ -6,11 +6,13 @@ import '../config/env_config.dart';
 import '../utils/app_logger.dart';
 import 'encryption_service.dart';
 import 'key_storage_service.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final GoogleSignIn _googleSignIn;
+  final NotificationService _notificationService = NotificationService();
 
   AuthService({
     FirebaseAuth? auth,
@@ -154,6 +156,14 @@ class AuthService {
           // Continue anyway - not critical
         }
 
+        // Save FCM token for push notifications
+        try {
+          await _notificationService.saveFCMToken(user.uid);
+        } catch (fcmError) {
+          AppLogger.warning('Failed to save FCM token: $fcmError');
+          // Continue anyway - not critical
+        }
+
         print('DEBUG: Returning user model from existing document');
         return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
       }
@@ -216,6 +226,13 @@ class AuthService {
             'lastActive': FieldValue.serverTimestamp(),
           });
 
+          // Save FCM token for push notifications
+          try {
+            await _notificationService.saveFCMToken(user.uid);
+          } catch (fcmError) {
+            AppLogger.warning('Failed to save FCM token: $fcmError');
+          }
+
           // Get and return existing user data
           return UserModel.fromMap(userDoc.data() as Map<String, dynamic>, user.uid);
         }
@@ -231,6 +248,13 @@ class AuthService {
   Future<void> signOut() async {
     try {
       if (currentUser != null) {
+        // Remove FCM token
+        try {
+          await _notificationService.removeFCMToken(currentUser!.uid);
+        } catch (e) {
+          AppLogger.warning('Error removing FCM token: $e');
+        }
+
         try {
           await _firestore.collection('users').doc(currentUser!.uid).update({
             'lastActive': FieldValue.serverTimestamp(),

@@ -2,9 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message.dart';
 import '../utils/app_logger.dart';
 import 'encryption_service.dart';
+import 'notification_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService();
 
   // Validate message content
   String? _validateMessage(String message) {
@@ -165,6 +167,33 @@ class ChatService {
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount.$receiverId': FieldValue.increment(1),
       });
+
+      // Send push notification to receiver
+      try {
+        // Get sender's name
+        final senderDoc = await _firestore.collection('users').doc(senderId).get();
+        final senderName = senderDoc.data()?['name'] ?? 'Someone';
+
+        // Prepare message preview (truncate if too long)
+        String messagePreview = sanitizedMessage;
+        if (messagePreview.length > 100) {
+          messagePreview = '${messagePreview.substring(0, 97)}...';
+        }
+
+        // Send notification
+        await _notificationService.sendMessageNotification(
+          senderId: senderId,
+          senderName: senderName,
+          receiverId: receiverId,
+          chatRoomId: chatRoomId,
+          messagePreview: messagePreview,
+        );
+
+        AppLogger.info('Notification sent to $receiverId');
+      } catch (notifError) {
+        // Don't fail message sending if notification fails
+        AppLogger.warning('Failed to send notification: $notifError');
+      }
     } catch (e) {
       AppLogger.error('Error sending message', e);
       rethrow;

@@ -28,6 +28,10 @@ class UserModel {
   final String? publicKey; // RSA public key in PEM format (stored in Firestore)
   final String? encryptedPrivateKey; // Private key encrypted with password (future use)
 
+  // Push notifications
+  final String? fcmToken; // Firebase Cloud Messaging token
+  final DateTime? fcmTokenUpdatedAt; // When the FCM token was last updated
+
   UserModel({
     required this.uid,
     required this.email,
@@ -51,6 +55,8 @@ class UserModel {
     this.preferredMaxDistance,
     this.publicKey,
     this.encryptedPrivateKey,
+    this.fcmToken,
+    this.fcmTokenUpdatedAt,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
@@ -77,6 +83,8 @@ class UserModel {
       preferredMaxDistance: map['preferredMaxDistance'],
       publicKey: map['publicKey'],
       encryptedPrivateKey: map['encryptedPrivateKey'],
+      fcmToken: map['fcmToken'],
+      fcmTokenUpdatedAt: (map['fcmTokenUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -104,6 +112,8 @@ class UserModel {
       'preferredMaxDistance': preferredMaxDistance,
       'publicKey': publicKey,
       'encryptedPrivateKey': encryptedPrivateKey,
+      'fcmToken': fcmToken,
+      'fcmTokenUpdatedAt': fcmTokenUpdatedAt != null ? Timestamp.fromDate(fcmTokenUpdatedAt!) : null,
     };
   }
 

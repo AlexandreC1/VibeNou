@@ -3,12 +3,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'utils/firebase_options.dart';
 import 'utils/supabase_config.dart';
 import 'utils/app_logger.dart';
+import 'services/notification_service.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
@@ -28,6 +30,14 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Set up background message handler for FCM
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Initialize Push Notifications
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  AppLogger.info('Push notifications initialized');
 
   // Initialize Supabase (only if configured)
   try {

@@ -21,7 +21,8 @@
       "Bash(java -version:*)",
       "Bash(firebase deploy:*)",
       "Bash(npx firebase deploy:*)",
-      "Bash(firebase projects:list:*)"
+      "Bash(firebase projects:list:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
