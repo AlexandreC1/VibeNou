@@ -5,8 +5,10 @@ import '../../l10n/app_localizations.dart';
 import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
 import '../../services/chat_service.dart';
+import '../../services/profile_view_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/report_dialog.dart';
+import '../../widgets/image_gallery_viewer.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel otherUser;
@@ -114,6 +116,62 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _showImageGallery() {
+    // Collect all available photos
+    List<String> allPhotos = [];
+
+    // Add main photo if available
+    if (widget.otherUser.photoUrl != null) {
+      allPhotos.add(widget.otherUser.photoUrl!);
+    }
+
+    // Add additional photos from gallery
+    allPhotos.addAll(widget.otherUser.photos);
+
+    // Remove duplicates (in case photoUrl is also in photos list)
+    allPhotos = allPhotos.toSet().toList();
+
+    if (allPhotos.isEmpty) {
+      // No photos available
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No photos available'),
+          backgroundColor: AppTheme.coral,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageGalleryViewer(
+          imageUrls: allPhotos,
+          initialIndex: 0,
+          userName: widget.otherUser.name,
+        ),
+      ),
+    );
+  }
+
+  void _showUserProfile() {
+    // Record profile view
+    ProfileViewService().recordProfileView(
+      viewerId: widget.currentUser.uid,
+      viewedUserId: widget.otherUser.uid,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _UserProfileSheet(
+        user: widget.otherUser,
+        currentUser: widget.currentUser,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -122,36 +180,45 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(
-              backgroundColor: Colors.white,
-              backgroundImage: widget.otherUser.photoUrl != null
-                  ? CachedNetworkImageProvider(widget.otherUser.photoUrl!)
-                  : null,
-              child: widget.otherUser.photoUrl == null
-                  ? Text(
-                      widget.otherUser.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: AppTheme.primaryRose,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
+            GestureDetector(
+              onTap: _showImageGallery,
+              child: Hero(
+                tag: 'chat_avatar_${widget.otherUser.uid}',
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  backgroundImage: widget.otherUser.photoUrl != null
+                      ? CachedNetworkImageProvider(widget.otherUser.photoUrl!)
+                      : null,
+                  child: widget.otherUser.photoUrl == null
+                      ? Text(
+                          widget.otherUser.name[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: AppTheme.primaryRose,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.otherUser.name,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  if (widget.otherUser.city != null)
+              child: GestureDetector(
+                onTap: _showUserProfile,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      widget.otherUser.city!,
-                      style: const TextStyle(fontSize: 12),
+                      widget.otherUser.name,
+                      style: const TextStyle(fontSize: 16),
                     ),
-                ],
+                    if (widget.otherUser.city != null)
+                      Text(
+                        widget.otherUser.city!,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -377,6 +444,359 @@ class _MessageBubble extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// User Profile Sheet Widget
+class _UserProfileSheet extends StatelessWidget {
+  final UserModel user;
+  final UserModel currentUser;
+
+  const _UserProfileSheet({
+    required this.user,
+    required this.currentUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 48,
+            height: 5,
+            decoration: BoxDecoration(
+              color: AppTheme.borderColor,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile picture with gradient border
+                  Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        // Show image gallery when tapping on profile picture
+                        _showImageGallery(context);
+                      },
+                      child: Hero(
+                        tag: 'user_profile_${user.uid}',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: AppTheme.sunsetGradient,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryRose.withValues(alpha: 0.4),
+                                blurRadius: 25,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(5),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: CircleAvatar(
+                              radius: 70,
+                              backgroundColor: AppTheme.primaryRose,
+                              backgroundImage: user.photoUrl != null
+                                  ? CachedNetworkImageProvider(user.photoUrl!)
+                                  : null,
+                              child: user.photoUrl == null
+                                  ? Text(
+                                      user.name[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 56,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Name and age with badge
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.name,
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryRose.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '${user.age}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Location with icon
+                  if (user.city != null)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.lavender,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 18,
+                              color: AppTheme.deepPurple,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              user.city!,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.deepPurple,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+
+                  // Bio section with card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.borderColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.loveGradient,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.info_outline,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              localizations.bio,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          user.bio,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                height: 1.5,
+                                color: AppTheme.textPrimary,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Interests section with card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.borderColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.purpleGradient,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.favorite,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              localizations.interests,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (user.interests.isEmpty)
+                          Text(
+                            'No interests added yet',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: user.interests.map((interest) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.lavender,
+                                      AppTheme.lavender.withValues(alpha: 0.7),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppTheme.royalPurple.withValues(alpha: 0.3),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  interest,
+                                  style: const TextStyle(
+                                    color: AppTheme.deepPurple,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImageGallery(BuildContext context) {
+    // Collect all available photos
+    List<String> allPhotos = [];
+
+    // Add main photo if available
+    if (user.photoUrl != null) {
+      allPhotos.add(user.photoUrl!);
+    }
+
+    // Add additional photos from gallery
+    allPhotos.addAll(user.photos);
+
+    // Remove duplicates
+    allPhotos = allPhotos.toSet().toList();
+
+    if (allPhotos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No photos available'),
+          backgroundColor: AppTheme.coral,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageGalleryViewer(
+          imageUrls: allPhotos,
+          initialIndex: 0,
+          userName: user.name,
+        ),
       ),
     );
   }

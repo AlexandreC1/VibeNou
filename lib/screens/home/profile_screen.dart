@@ -638,48 +638,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Select Language'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            String selectedLanguage = _currentUser!.preferredLanguage;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile<String>(
-                  title: const Text('English'),
-                  value: 'en',
-                  selected: selectedLanguage == 'en',
-                  onChanged: (value) {
-                    if (value != null) {
-                      _changeLanguage(value);
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Français'),
-                  value: 'fr',
-                  selected: selectedLanguage == 'fr',
-                  onChanged: (value) {
-                    if (value != null) {
-                      _changeLanguage(value);
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Kreyòl Ayisyen'),
-                  value: 'ht',
-                  selected: selectedLanguage == 'ht',
-                  onChanged: (value) {
-                    if (value != null) {
-                      _changeLanguage(value);
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-              ],
-            );
-          },
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('English'),
+              value: 'en',
+              groupValue: _currentUser!.preferredLanguage,
+              onChanged: (value) {
+                if (value != null) {
+                  _changeLanguage(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Français'),
+              value: 'fr',
+              groupValue: _currentUser!.preferredLanguage,
+              onChanged: (value) {
+                if (value != null) {
+                  _changeLanguage(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Kreyòl Ayisyen'),
+              value: 'ht',
+              groupValue: _currentUser!.preferredLanguage,
+              onChanged: (value) {
+                if (value != null) {
+                  _changeLanguage(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

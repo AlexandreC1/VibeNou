@@ -514,7 +514,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                   const SizedBox(height: 20),
 
                   DropdownButtonFormField<String>(
-                    value: _selectedGender,
+                    initialValue: _selectedGender,
                     decoration: const InputDecoration(
                       labelText: 'Gender',
                       prefixIcon: Icon(Icons.person_outline),
@@ -575,7 +575,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                             'Allow others to see your approximate location',
                           ),
                           value: _locationSharingEnabled,
-                          activeTrackColor: AppTheme.primaryRose.withOpacity(0.5),
+                          activeTrackColor: AppTheme.primaryRose.withValues(alpha: 0.5),
                           activeThumbColor: AppTheme.primaryRose,
                           onChanged: (value) {
                             setState(() {
@@ -1113,7 +1113,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                         : 'Show users within $_preferredMaxDistance km',
                   ),
                   value: _preferredMaxDistance != null,
-                  activeTrackColor: AppTheme.primaryRose.withOpacity(0.5),
+                  activeTrackColor: AppTheme.primaryRose.withValues(alpha: 0.5),
                   activeThumbColor: AppTheme.primaryRose,
                   onChanged: (value) {
                     setState(() {
@@ -1171,7 +1171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
             decoration: BoxDecoration(
               color: AppTheme.softPink,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryRose.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.primaryRose.withValues(alpha: 0.3)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
