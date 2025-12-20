@@ -10,6 +10,7 @@ import '../../services/profile_view_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/language_provider.dart';
+import '../../widgets/image_gallery_viewer.dart';
 import '../profile/edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -247,6 +248,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showImageGallery() {
+    if (_currentUser == null) return;
+
+    // Collect all available photos
+    List<String> allPhotos = [];
+
+    // Add main photo if available
+    if (_currentUser!.photoUrl != null) {
+      allPhotos.add(_currentUser!.photoUrl!);
+    }
+
+    // Add additional photos from gallery
+    allPhotos.addAll(_currentUser!.photos);
+
+    // Remove duplicates (in case photoUrl is also in photos list)
+    allPhotos = allPhotos.toSet().toList();
+
+    if (allPhotos.isEmpty) {
+      // No photos available
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No photos available'),
+          backgroundColor: AppTheme.coral,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageGalleryViewer(
+          imageUrls: allPhotos,
+          initialIndex: 0,
+          userName: _currentUser!.name,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -354,39 +395,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Column(
                   children: [
-                    Hero(
-                      tag: 'profile_avatar_${_currentUser!.uid}',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 4,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                    GestureDetector(
+                      onTap: _showImageGallery,
+                      child: Hero(
+                        tag: 'profile_avatar_${_currentUser!.uid}',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 4,
                             ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 60,
-                          backgroundColor: Colors.white,
-                          backgroundImage: _currentUser!.photoUrl != null
-                              ? CachedNetworkImageProvider(_currentUser!.photoUrl!)
-                              : null,
-                          child: _currentUser!.photoUrl == null
-                              ? Text(
-                                  _currentUser!.name[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 48,
-                                    color: AppTheme.primaryRose,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.white,
+                            backgroundImage: _currentUser!.photoUrl != null
+                                ? CachedNetworkImageProvider(_currentUser!.photoUrl!)
+                                : null,
+                            child: _currentUser!.photoUrl == null
+                                ? Text(
+                                    _currentUser!.name[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 48,
+                                      color: AppTheme.primaryRose,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
                         ),
                       ),
                     ),
