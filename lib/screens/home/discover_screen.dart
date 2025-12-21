@@ -182,11 +182,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     setState(() => _isLoadingNearby = true);
 
     try {
-      print('DEBUG: Fetching nearby users within 50km...');
+      // Use user's preferred max distance, default to 10000km (global) if not set
+      final radiusInKm = _currentUser!.preferredMaxDistance?.toDouble() ?? 10000.0;
+      print('DEBUG: Fetching nearby users within ${radiusInKm}km...');
       final users = await _userService.getNearbyUsers(
         currentUserId: _currentUser!.uid,
         userLocation: _currentUser!.location!,
-        radiusInKm: 50,
+        radiusInKm: radiusInKm,
       );
 
       print('DEBUG: Found ${users.length} nearby users');

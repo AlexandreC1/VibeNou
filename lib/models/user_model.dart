@@ -17,11 +17,15 @@ class UserModel {
   final String preferredLanguage;
   final bool locationSharingEnabled; // Control whether to share location
   final String? gender; // 'male' or 'female'
+  final String? ethnicity; // User's ethnicity
+  final String? sexualOrientation; // 'straight', 'gay', 'lesbian', 'bisexual', 'other'
 
   // Dating preferences
   final int preferredAgeMin; // Minimum age looking for
   final int preferredAgeMax; // Maximum age looking for
   final String? preferredGender; // Gender preference: 'male', 'female', or null for any
+  final List<String> preferredEthnicities; // Empty list means all ethnicities
+  final List<String> preferredInterests; // Empty list means all interests
   final int? preferredMaxDistance; // Max distance in km, null for any distance
 
   // Encryption keys for end-to-end encrypted chat
@@ -49,9 +53,13 @@ class UserModel {
     this.preferredLanguage = 'en',
     this.locationSharingEnabled = true,
     this.gender,
+    this.ethnicity,
+    this.sexualOrientation,
     this.preferredAgeMin = 18,
     this.preferredAgeMax = 100,
     this.preferredGender,
+    this.preferredEthnicities = const [],
+    this.preferredInterests = const [],
     this.preferredMaxDistance,
     this.publicKey,
     this.encryptedPrivateKey,
@@ -77,9 +85,13 @@ class UserModel {
       preferredLanguage: map['preferredLanguage'] ?? 'en',
       locationSharingEnabled: map['locationSharingEnabled'] ?? true,
       gender: map['gender'],
+      ethnicity: map['ethnicity'],
+      sexualOrientation: map['sexualOrientation'],
       preferredAgeMin: map['preferredAgeMin'] ?? 18,
       preferredAgeMax: map['preferredAgeMax'] ?? 100,
       preferredGender: map['preferredGender'],
+      preferredEthnicities: List<String>.from(map['preferredEthnicities'] ?? []),
+      preferredInterests: List<String>.from(map['preferredInterests'] ?? []),
       preferredMaxDistance: map['preferredMaxDistance'],
       publicKey: map['publicKey'],
       encryptedPrivateKey: map['encryptedPrivateKey'],
@@ -106,9 +118,13 @@ class UserModel {
       'preferredLanguage': preferredLanguage,
       'locationSharingEnabled': locationSharingEnabled,
       'gender': gender,
+      'ethnicity': ethnicity,
+      'sexualOrientation': sexualOrientation,
       'preferredAgeMin': preferredAgeMin,
       'preferredAgeMax': preferredAgeMax,
       'preferredGender': preferredGender,
+      'preferredEthnicities': preferredEthnicities,
+      'preferredInterests': preferredInterests,
       'preferredMaxDistance': preferredMaxDistance,
       'publicKey': publicKey,
       'encryptedPrivateKey': encryptedPrivateKey,
@@ -134,9 +150,13 @@ class UserModel {
     String? preferredLanguage,
     bool? locationSharingEnabled,
     String? gender,
+    String? ethnicity,
+    String? sexualOrientation,
     int? preferredAgeMin,
     int? preferredAgeMax,
     String? preferredGender,
+    List<String>? preferredEthnicities,
+    List<String>? preferredInterests,
     int? preferredMaxDistance,
     String? publicKey,
     String? encryptedPrivateKey,
@@ -158,9 +178,13 @@ class UserModel {
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       locationSharingEnabled: locationSharingEnabled ?? this.locationSharingEnabled,
       gender: gender ?? this.gender,
+      ethnicity: ethnicity ?? this.ethnicity,
+      sexualOrientation: sexualOrientation ?? this.sexualOrientation,
       preferredAgeMin: preferredAgeMin ?? this.preferredAgeMin,
       preferredAgeMax: preferredAgeMax ?? this.preferredAgeMax,
       preferredGender: preferredGender ?? this.preferredGender,
+      preferredEthnicities: preferredEthnicities ?? this.preferredEthnicities,
+      preferredInterests: preferredInterests ?? this.preferredInterests,
       preferredMaxDistance: preferredMaxDistance ?? this.preferredMaxDistance,
       publicKey: publicKey ?? this.publicKey,
       encryptedPrivateKey: encryptedPrivateKey ?? this.encryptedPrivateKey,
