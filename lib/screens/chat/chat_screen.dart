@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -29,11 +30,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   String? _chatRoomId;
   bool _isSending = false;
+  Timer? _typingTimer;
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
     _initChat();
+    _messageController.addListener(_onTextChanged);
   }
 
   Future<void> _initChat() async {
@@ -73,8 +77,59 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
+    _clearTypingStatus();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    if (_chatRoomId == null) return;
+
+    final hasText = _messageController.text.trim().isNotEmpty;
+
+    // Set typing status if user is typing
+    if (hasText && !_isTyping) {
+      _isTyping = true;
+      _setTypingStatus(true);
+    }
+
+    // Cancel existing timer
+    _typingTimer?.cancel();
+
+    // Set timer to clear typing status after 3 seconds of no typing
+    if (hasText) {
+      _typingTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) {
+          _isTyping = false;
+          _setTypingStatus(false);
+        }
+      });
+    } else {
+      // Clear typing immediately if text is deleted
+      _isTyping = false;
+      _setTypingStatus(false);
+    }
+  }
+
+  void _setTypingStatus(bool isTyping) {
+    if (_chatRoomId == null) return;
+    _chatService.setTypingStatus(
+      chatRoomId: _chatRoomId!,
+      userId: widget.currentUser.uid,
+      isTyping: isTyping,
+    );
+  }
+
+  void _clearTypingStatus() {
+    if (_chatRoomId != null) {
+      _chatService.setTypingStatus(
+        chatRoomId: _chatRoomId!,
+        userId: widget.currentUser.uid,
+        isTyping: false,
+      );
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -82,6 +137,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final message = _messageController.text.trim();
     _messageController.clear();
+
+    // Clear typing status when sending message
+    _isTyping = false;
+    _typingTimer?.cancel();
+    _clearTypingStatus();
 
     setState(() => _isSending = true);
 
@@ -304,6 +364,47 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
               },
             ),
+          ),
+          // Typing indicator
+          StreamBuilder<bool>(
+            stream: _chatService.getTypingStatus(
+              chatRoomId: _chatRoomId!,
+              otherUserId: widget.otherUser.uid,
+            ),
+            builder: (context, snapshot) {
+              final isTyping = snapshot.data ?? false;
+
+              if (!isTyping) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${widget.otherUser.name} is typing',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.textSecondary.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           _buildMessageInput(localizations),
         ],

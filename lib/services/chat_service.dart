@@ -386,4 +386,50 @@ class ChatService {
       rethrow;
     }
   }
+
+  // Set typing status
+  Future<void> setTypingStatus({
+    required String chatRoomId,
+    required String userId,
+    required bool isTyping,
+  }) async {
+    try {
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'typing.$userId': isTyping ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      });
+    } catch (e) {
+      AppLogger.error('Error setting typing status', e);
+      // Don't throw - typing indicator is not critical
+    }
+  }
+
+  // Get typing status stream
+  Stream<bool> getTypingStatus({
+    required String chatRoomId,
+    required String otherUserId,
+  }) {
+    return _firestore
+        .collection('chatRooms')
+        .doc(chatRoomId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return false;
+
+      final data = snapshot.data();
+      if (data == null) return false;
+
+      final typing = data['typing'] as Map<String, dynamic>?;
+      if (typing == null || !typing.containsKey(otherUserId)) return false;
+
+      // Check if typing timestamp is recent (within last 5 seconds)
+      final typingTimestamp = typing[otherUserId] as Timestamp?;
+      if (typingTimestamp == null) return false;
+
+      final now = DateTime.now();
+      final typingTime = typingTimestamp.toDate();
+      final difference = now.difference(typingTime).inSeconds;
+
+      return difference < 5; // Consider typing if within last 5 seconds
+    });
+  }
 }
