@@ -22,7 +22,8 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> with SingleTickerProviderStateMixin {
+class _EditProfileScreenState extends State<EditProfileScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final SupabaseImageService _imageUploadService = SupabaseImageService();
   final LocationService _locationService = LocationService();
@@ -65,7 +66,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   // Dating preferences
   int _preferredAgeMin = 18;
   int _preferredAgeMax = 100;
-  String? _preferredGender; // 'male', 'female', or null for any
+  String? _preferredGender; // 'male', 'female', 'other', or null for any
+  String? _preferredGenderOther; // Custom text when 'other' is selected
   int? _preferredMaxDistance; // in km
   String? _selectedGender; // User's own gender
 
@@ -75,7 +77,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     _tabController = TabController(length: 4, vsync: this);
     _nameController = TextEditingController(text: widget.currentUser.name);
     _bioController = TextEditingController(text: widget.currentUser.bio);
-    _ageController = TextEditingController(text: widget.currentUser.age.toString());
+    _ageController =
+        TextEditingController(text: widget.currentUser.age.toString());
     _selectedInterests = List.from(widget.currentUser.interests);
     _photoUrl = widget.currentUser.photoUrl;
     _photos = List.from(widget.currentUser.photos);
@@ -224,6 +227,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     }
   }
 
+  void _showOtherGenderDialog() {
+    final controller = TextEditingController(text: _preferredGenderOther ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('What are you looking for?'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'e.g., Non-binary, Genderfluid, etc.',
+            border: OutlineInputBorder(),
+          ),
+          maxLength: 50,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _preferredGenderOther = controller.text.trim();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) {
       _tabController.animateTo(0); // Go to basic info tab if validation fails
@@ -305,9 +342,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
 
+    // Gender-based theming
+    final gradient = widget.currentUser.gender == 'male'
+        ? AppTheme.primaryBlueGradient
+        : AppTheme.primaryGradient;
+    final accentColor = widget.currentUser.gender == 'male'
+        ? AppTheme.primaryBlue
+        : AppTheme.primaryRose;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: gradient),
+        ),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -362,8 +410,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           children: [
             // Profile Picture Section
             Container(
-              decoration: const BoxDecoration(
-                gradient: AppTheme.primaryGradient,
+              decoration: BoxDecoration(
+                gradient: gradient,
               ),
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Column(
@@ -417,7 +465,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              gradient: AppTheme.sunsetGradient,
+                              gradient: gradient,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: Colors.white,
@@ -425,7 +473,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.primaryRose.withValues(alpha: 0.3),
+                                  color: AppTheme.primaryRose
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -437,7 +486,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
                                     ),
                                   )
                                 : const Icon(
@@ -475,7 +525,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
@@ -489,9 +538,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 20),
-
                   TextFormField(
                     controller: _ageController,
                     keyboardType: TextInputType.number,
@@ -510,9 +557,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 20),
-
                   DropdownButtonFormField<String>(
                     initialValue: _selectedGender,
                     decoration: const InputDecoration(
@@ -530,9 +575,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       });
                     },
                   ),
-
                   const SizedBox(height: 20),
-
                   TextFormField(
                     controller: _bioController,
                     maxLines: 4,
@@ -553,15 +596,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 32),
-
                   Text(
                     'Location Settings',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: AppTheme.borderColor),
@@ -575,7 +615,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                             'Allow others to see your approximate location',
                           ),
                           value: _locationSharingEnabled,
-                          activeTrackColor: AppTheme.primaryRose.withValues(alpha: 0.5),
+                          activeTrackColor:
+                              AppTheme.primaryRose.withValues(alpha: 0.5),
                           activeThumbColor: AppTheme.primaryRose,
                           onChanged: (value) {
                             setState(() {
@@ -606,7 +647,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 40),
                 ],
               ),
@@ -631,8 +671,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Select at least one interest to help us connect you with like-minded people',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+                  color: AppTheme.textSecondary,
+                ),
           ),
           const SizedBox(height: 24),
 
@@ -640,7 +680,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
+              gradient: gradient,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -681,7 +721,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                 selectedColor: AppTheme.softPink,
                 checkmarkColor: AppTheme.deepPink,
                 labelStyle: TextStyle(
-                  color: isSelected ? AppTheme.deepPink : AppTheme.textSecondary,
+                  color:
+                      isSelected ? AppTheme.deepPink : AppTheme.textSecondary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               );
@@ -708,8 +749,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Add up to $_maxPhotos photos to showcase your personality',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+                  color: AppTheme.textSecondary,
+                ),
           ),
           const SizedBox(height: 24),
 
@@ -717,7 +758,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: AppTheme.sunsetGradient,
+              gradient: gradient,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -767,7 +808,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          _isUploadingImage ? Icons.hourglass_empty : Icons.add_photo_alternate,
+                          _isUploadingImage
+                              ? Icons.hourglass_empty
+                              : Icons.add_photo_alternate,
                           color: AppTheme.primaryRose,
                           size: 32,
                         ),
@@ -878,25 +921,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                 ],
               ),
             ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: () => _removePhoto(index, isNew: true),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AppTheme.coral,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 16,
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: () => _removePhoto(index, isNew: true),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: AppTheme.coral,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
             Positioned(
               bottom: 4,
               left: 4,
@@ -936,8 +979,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Set your preferences to find better matches',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+                  color: AppTheme.textSecondary,
+                ),
           ),
           const SizedBox(height: 32),
 
@@ -945,13 +988,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Preferred Age Range',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Ages $_preferredAgeMin - $_preferredAgeMax',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppTheme.royalPurple,
@@ -962,9 +1005,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           // Min Age Slider
           Row(
             children: [
-              const Icon(Icons.cake_outlined, color: AppTheme.primaryRose, size: 20),
+              const Icon(Icons.cake_outlined,
+                  color: AppTheme.primaryRose, size: 20),
               const SizedBox(width: 12),
-              const Text('Min Age:', style: TextStyle(fontWeight: FontWeight.w500)),
+              const Text('Min Age:',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
               const Spacer(),
               Text(
                 '$_preferredAgeMin years',
@@ -997,9 +1042,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           // Max Age Slider
           Row(
             children: [
-              const Icon(Icons.cake_outlined, color: AppTheme.primaryRose, size: 20),
+              const Icon(Icons.cake_outlined,
+                  color: AppTheme.primaryRose, size: 20),
               const SizedBox(width: 12),
-              const Text('Max Age:', style: TextStyle(fontWeight: FontWeight.w500)),
+              const Text('Max Age:',
+                  style: TextStyle(fontWeight: FontWeight.w500)),
               const Spacer(),
               Text(
                 '$_preferredAgeMax years',
@@ -1033,8 +1080,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Looking For',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 16),
 
@@ -1043,47 +1090,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
               border: Border.all(color: AppTheme.borderColor),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Column(
-              children: [
-                RadioListTile<String?>(
-                  title: const Text('Everyone'),
-                  subtitle: const Text('Show all genders'),
-                  value: null,
-                  groupValue: _preferredGender,
-                  activeColor: AppTheme.primaryRose,
-                  onChanged: (value) {
-                    setState(() {
-                      _preferredGender = value;
-                    });
-                  },
-                ),
-                const Divider(height: 1),
-                RadioListTile<String?>(
-                  title: const Text('Men'),
-                  subtitle: const Text('Show only men'),
-                  value: 'male',
-                  groupValue: _preferredGender,
-                  activeColor: AppTheme.primaryRose,
-                  onChanged: (value) {
-                    setState(() {
-                      _preferredGender = value;
-                    });
-                  },
-                ),
-                const Divider(height: 1),
-                RadioListTile<String?>(
-                  title: const Text('Women'),
-                  subtitle: const Text('Show only women'),
-                  value: 'female',
-                  groupValue: _preferredGender,
-                  activeColor: AppTheme.primaryRose,
-                  onChanged: (value) {
-                    setState(() {
-                      _preferredGender = value;
-                    });
-                  },
-                ),
-              ],
+            child: RadioGroup<String?>(
+              groupValue: _preferredGender,
+              onChanged: (value) {
+                setState(() {
+                  _preferredGender = value;
+                  if (value == 'other') {
+                    _showOtherGenderDialog();
+                  } else {
+                    _preferredGenderOther = null;
+                  }
+                });
+              },
+              child: Column(
+                children: [
+                  RadioListTile<String?>(
+                    title: const Text('Everyone'),
+                    subtitle: const Text('Show all genders'),
+                    value: null,
+                    activeColor: AppTheme.primaryRose,
+                    toggleable: true,
+                  ),
+                  const Divider(height: 1),
+                  RadioListTile<String?>(
+                    title: const Text('Men'),
+                    subtitle: const Text('Show only men'),
+                    value: 'male',
+                    activeColor: AppTheme.primaryRose,
+                    toggleable: true,
+                  ),
+                  const Divider(height: 1),
+                  RadioListTile<String?>(
+                    title: const Text('Women'),
+                    subtitle: const Text('Show only women'),
+                    value: 'female',
+                    activeColor: AppTheme.primaryRose,
+                    toggleable: true,
+                  ),
+                  const Divider(height: 1),
+                  RadioListTile<String?>(
+                    title: const Text('Other'),
+                    subtitle: Text(
+                      _preferredGenderOther != null && _preferredGenderOther!.isNotEmpty
+                          ? _preferredGenderOther!
+                          : 'Specify what you\'re looking for',
+                    ),
+                    value: 'other',
+                    activeColor: AppTheme.primaryRose,
+                    toggleable: true,
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -1093,8 +1150,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           Text(
             'Maximum Distance',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 16),
 
@@ -1129,12 +1186,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.location_on, color: AppTheme.primaryRose, size: 20),
+                            const Icon(Icons.location_on,
+                                color: AppTheme.primaryRose, size: 20),
                             const SizedBox(width: 12),
-                            const Text('Distance:', style: TextStyle(fontWeight: FontWeight.w500)),
+                            const Text('Distance:',
+                                style: TextStyle(fontWeight: FontWeight.w500)),
                             const Spacer(),
                             Text(
-                              '${_preferredMaxDistance} km',
+                              '$_preferredMaxDistance km',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -1171,21 +1230,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
             decoration: BoxDecoration(
               color: AppTheme.softPink,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryRose.withValues(alpha: 0.3)),
+              border: Border.all(
+                  color: AppTheme.primaryRose.withValues(alpha: 0.3)),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline,
                   color: AppTheme.deepPink,
                   size: 24,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'How Preferences Work',
                         style: TextStyle(

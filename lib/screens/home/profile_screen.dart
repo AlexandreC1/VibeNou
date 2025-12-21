@@ -357,18 +357,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
+    // Get gender-based gradient
+    final gradient = _currentUser!.gender == 'male'
+        ? AppTheme.primaryBlueGradient
+        : AppTheme.primaryGradient;
+    final accentColor = _currentUser!.gender == 'male'
+        ? AppTheme.primaryBlue
+        : AppTheme.primaryRose;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.profile),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // Navigate to edit profile screen
-              _showEditProfile();
-            },
-          ),
-        ],
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: gradient),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showEditProfile,
+        backgroundColor: accentColor,
+        icon: const Icon(Icons.edit, color: Colors.white),
+        label: const Text(
+          'Edit Profile',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -389,8 +400,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               child: Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
+                decoration: BoxDecoration(
+                  gradient: gradient,
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Column(
@@ -531,6 +542,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 32),
 
+            // Photo Gallery Management Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Card(
+                elevation: 4,
+                child: InkWell(
+                  onTap: () {
+                    _showEditProfile();
+                    // TODO: Navigate directly to photos tab if we keep tabs
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _currentUser!.gender == 'male'
+                            ? [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.teal.withValues(alpha: 0.1)]
+                            : [AppTheme.softPink, AppTheme.lavender],
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: gradient,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: accentColor.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add_photo_alternate,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Manage Photos',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Add up to 6 photos (${_currentUser!.photos.length + (_currentUser!.photoUrl != null ? 1 : 0)}/6)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: accentColor,
+                          size: 28,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // Profile Views
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -545,7 +637,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            gradient: AppTheme.sunsetGradient,
+                            gradient: gradient,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(

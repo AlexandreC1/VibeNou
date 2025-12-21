@@ -311,7 +311,12 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: _chatService.getMessages(_chatRoomId!),
+              stream: _chatService.getRecentMessages(
+                _chatRoomId!,
+                limit: 50,
+                userId: widget.currentUser.uid,
+                userPrivateKey: null, // TODO: Pass private key when encryption is fully enabled
+              ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -486,6 +491,38 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Determine bubble decoration based on read status
+    BoxDecoration getBubbleDecoration() {
+      if (isMe) {
+        // For sent messages, show different colors based on read status
+        if (message.isRead) {
+          // Message has been read - show full gradient
+          return BoxDecoration(
+            gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.circular(20).copyWith(
+              bottomRight: const Radius.circular(4),
+            ),
+          );
+        } else {
+          // Message not yet read - show faded/gray version
+          return BoxDecoration(
+            color: AppTheme.textSecondary.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(20).copyWith(
+              bottomRight: const Radius.circular(4),
+            ),
+          );
+        }
+      } else {
+        // Received messages - always use background color
+        return BoxDecoration(
+          color: AppTheme.backgroundColor,
+          borderRadius: BorderRadius.circular(20).copyWith(
+            bottomLeft: const Radius.circular(4),
+          ),
+        );
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -510,16 +547,9 @@ class _MessageBubble extends StatelessWidget {
                     horizontal: 16,
                     vertical: 10,
                   ),
-                  decoration: BoxDecoration(
-                    gradient: isMe ? AppTheme.primaryGradient : null,
-                    color: isMe ? null : AppTheme.backgroundColor,
-                    borderRadius: BorderRadius.circular(20).copyWith(
-                      bottomRight: isMe ? const Radius.circular(4) : null,
-                      bottomLeft: isMe ? null : const Radius.circular(4),
-                    ),
-                  ),
+                  decoration: getBubbleDecoration(),
                   child: Text(
-                    message.message,
+                    message.displayMessage,
                     style: TextStyle(
                       color: isMe ? Colors.white : AppTheme.textPrimary,
                       fontSize: 15,
@@ -527,11 +557,26 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  timeago.format(message.timestamp),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      timeago.format(message.timestamp),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                          ),
+                    ),
+                    if (isMe) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        message.isRead ? Icons.done_all : Icons.done,
+                        size: 14,
+                        color: message.isRead
+                            ? AppTheme.primaryRose
+                            : AppTheme.textSecondary,
                       ),
+                    ],
+                  ],
                 ),
               ],
             ),

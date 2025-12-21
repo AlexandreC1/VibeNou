@@ -149,6 +149,7 @@ class ChatService {
         receiverId: receiverId,
         message: displayMessage,
         timestamp: DateTime.now(),
+        isRead: false, // Explicitly set to false for new messages
         imageUrl: imageUrl,
         encryptedMessage: encryptedMessage,
         iv: iv,
@@ -373,9 +374,29 @@ class ChatService {
 
       // Only update if there are unread messages
       if (unreadCount > 0) {
+        // Update unread count
         await _firestore.collection('chatRooms').doc(chatRoomId).update({
           'unreadCount.$userId': 0,
         });
+
+        // Mark individual messages as read
+        final messagesSnapshot = await _firestore
+            .collection('chatRooms')
+            .doc(chatRoomId)
+            .collection('messages')
+            .where('receiverId', isEqualTo: userId)
+            .where('isRead', isEqualTo: false)
+            .get();
+
+        // Use batch write for efficiency
+        if (messagesSnapshot.docs.isNotEmpty) {
+          final batch = _firestore.batch();
+          for (var doc in messagesSnapshot.docs) {
+            batch.update(doc.reference, {'isRead': true});
+          }
+          await batch.commit();
+          AppLogger.info('Marked ${messagesSnapshot.docs.length} messages as read');
+        }
       }
     } catch (e) {
       AppLogger.error('Error marking as read', e);
