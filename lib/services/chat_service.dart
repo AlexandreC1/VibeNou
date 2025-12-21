@@ -344,6 +344,23 @@ class ChatService {
             .toList());
   }
 
+  // Get total unread message count for a user
+  Stream<int> getTotalUnreadCount(String userId) {
+    return _firestore
+        .collection('chatRooms')
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+      int totalUnread = 0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final unreadCount = (data['unreadCount'] as Map<String, dynamic>?)?[userId] ?? 0;
+        totalUnread += unreadCount as int;
+      }
+      return totalUnread;
+    });
+  }
+
   // Mark messages as read (optimized to avoid unnecessary writes)
   Future<void> markAsRead(String chatRoomId, String userId) async {
     try {
