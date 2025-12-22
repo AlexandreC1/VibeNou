@@ -1,3 +1,27 @@
+/// ProfileScreen - User Profile Display and Management
+///
+/// This screen displays the current user's profile information including:
+/// - Profile picture and basic info (name, age, location)
+/// - Bio and interests
+/// - Photo gallery management
+/// - Profile view tracking
+/// - Settings (language, location)
+///
+/// FEATURES:
+/// - Gender-based theming (Blue for male, Pink for female)
+/// - Floating action button for easy profile editing
+/// - Prominent photo management card for easy photo uploads
+/// - Real-time profile view notifications
+/// - Multi-language support
+///
+/// FUTURE IMPROVEMENTS:
+/// - Add profile completion percentage
+/// - Add social media links
+/// - Add profile verification badge
+///
+/// Last updated: 2025-12-22
+/// Author: VibeNou Team
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,6 +37,11 @@ import '../../providers/language_provider.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../profile/edit_profile_screen.dart';
 
+/// ProfileScreen Widget
+///
+/// Displays the authenticated user's profile with gender-based theming.
+/// This is a stateful widget that loads user data from Firestore and
+/// displays it in a scrollable, visually appealing layout.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -20,15 +49,37 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+/// State class for ProfileScreen
+///
+/// Manages:
+/// - User data loading and caching
+/// - Profile view count tracking
+/// - UI state (loading, error handling)
+/// - Navigation to edit profile and image gallery
 class _ProfileScreenState extends State<ProfileScreen> {
+  // ========== STATE VARIABLES ==========
+
+  /// Current user's complete profile data from Firestore
+  /// Null during initial load or if user is not authenticated
   UserModel? _currentUser;
+
+  /// Loading state for profile data fetch
+  /// True during initial load and refresh operations
   bool _isLoading = true;
+
+  /// Count of unread profile views
+  /// Updated in real-time via Firestore stream
   int _unreadViewCount = 0;
+
+  /// Service for tracking who viewed the user's profile
   final ProfileViewService _profileViewService = ProfileViewService();
+
+  // ========== LIFECYCLE METHODS ==========
 
   @override
   void initState() {
     super.initState();
+    // Load profile data and view count on first render
     _loadUserProfile();
     _loadUnreadViewCount();
   }
@@ -36,11 +87,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload profile when dependencies change (e.g., after login)
+    // Reload profile when dependencies change (e.g., after login, language change)
+    // This ensures the profile stays in sync with auth state changes
     _loadUserProfile();
     _loadUnreadViewCount();
   }
 
+  // ========== DATA LOADING METHODS ==========
+
+  /// Loads the current user's profile data from Firestore
+  ///
+  /// This method:
+  /// 1. Gets the authenticated user from AuthService
+  /// 2. Fetches full profile data from Firestore
+  /// 3. Updates UI state with loaded data
+  ///
+  /// Called on:
+  /// - Initial screen load
+  /// - Dependency changes (login/logout)
+  /// - Manual refresh
+  ///
+  /// NOTE: Uses `mounted` check to prevent setState on disposed widgets
   Future<void> _loadUserProfile() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {

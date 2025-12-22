@@ -1,14 +1,84 @@
+/// ChatService - Core Messaging and Encryption System
+///
+/// This service handles all chat-related operations including:
+/// - Message sending/receiving with optional end-to-end encryption
+/// - Chat room creation and management
+/// - Message read receipts and status tracking
+/// - Real-time message streams with pagination
+/// - Typing indicators
+/// - Push notification integration
+///
+/// ENCRYPTION:
+/// The service implements hybrid encryption:
+/// - RSA-2048 for secure key exchange
+/// - AES-256-GCM for message encryption
+/// - Each chat room has a unique symmetric key
+/// - Private keys never leave the device
+///
+/// READ RECEIPTS:
+/// - Messages sent with isRead: false
+/// - Batch updated when recipient opens chat
+/// - Real-time status sync via Firestore
+///
+/// SECURITY FEATURES:
+/// - Input validation (max 5000 chars)
+/// - XSS/Script tag sanitization
+/// - Graceful fallback to plaintext if encryption fails
+/// - All encryption operations logged for debugging
+///
+/// PERFORMANCE OPTIMIZATIONS:
+/// - Message pagination (default 20 per page)
+/// - Batch writes for read receipts
+/// - Firestore query optimization
+/// - Only update unread count when > 0
+///
+/// FUTURE IMPROVEMENTS:
+/// - Message delivery receipts (in addition to read receipts)
+/// - Message editing/deletion
+/// - Media message support (images, voice)
+/// - Message search functionality
+///
+/// Last updated: 2025-12-22
+/// Author: VibeNou Team
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_message.dart';
 import '../utils/app_logger.dart';
 import 'encryption_service.dart';
 import 'notification_service.dart';
 
+/// ChatService - Main service for all messaging operations
+///
+/// This service is the single source of truth for all chat functionality.
+/// It integrates encryption, notifications, and Firestore operations.
 class ChatService {
+  // ========== DEPENDENCIES ==========
+
+  /// Firestore instance for database operations
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// Service for sending push notifications to users
   final NotificationService _notificationService = NotificationService();
 
-  // Validate message content
+  // ========== MESSAGE VALIDATION ==========
+
+  /// Validates message content before sending
+  ///
+  /// Checks:
+  /// - Message is not empty (after trimming)
+  /// - Message is not too long (max 5000 characters)
+  ///
+  /// Returns:
+  /// - `null` if message is valid
+  /// - Error string if validation fails
+  ///
+  /// Example:
+  /// ```dart
+  /// final error = _validateMessage("Hello!");
+  /// if (error != null) {
+  ///   // Show error to user
+  /// }
+  /// ```
   String? _validateMessage(String message) {
     final trimmed = message.trim();
 
@@ -23,22 +93,102 @@ class ChatService {
     return null; // Valid
   }
 
-  // Sanitize message content (remove potential HTML/script tags)
+  // ========== MESSAGE SANITIZATION ==========
+
+  /// Sanitizes message content to prevent XSS attacks
+  ///
+  /// Removes:
+  /// - `<script>` tags and their content
+  /// - All HTML tags
+  ///
+  /// This is a defense-in-depth measure. Even though messages are displayed
+  /// as plain text in Flutter, we sanitize to prevent any potential issues
+  /// if messages are displayed in web views or other contexts.
+  ///
+  /// Parameters:
+  /// - [message]: Raw message text to sanitize
+  ///
+  /// Returns: Sanitized message safe for storage and display
+  ///
+  /// Example:
+  /// ```dart
+  /// final safe = _sanitizeMessage("<script>alert('xss')</script>Hello");
+  /// // Returns: "Hello"
+  /// ```
   String _sanitizeMessage(String message) {
     return message
         .trim()
+        // Remove script tags (case insensitive)
         .replaceAll(RegExp(r'<script[^>]*>.*?</script>', caseSensitive: false), '')
+        // Remove all other HTML tags
         .replaceAll(RegExp(r'<[^>]+>'), '');
   }
 
-  // Generate chat room ID
+  // ========== CHAT ROOM MANAGEMENT ==========
+
+  /// Generates a deterministic chat room ID from two user IDs
+  ///
+  /// The ID is the same regardless of which user initiates the chat.
+  /// This ensures there's only one chat room between any two users.
+  ///
+  /// Algorithm:
+  /// 1. Put both user IDs in a list
+  /// 2. Sort alphabetically
+  /// 3. Join with underscore
+  ///
+  /// Parameters:
+  /// - [userId1]: First user's ID
+  /// - [userId2]: Second user's ID
+  ///
+  /// Returns: Deterministic chat room ID (e.g., "abc123_def456")
+  ///
+  /// Example:
+  /// ```dart
+  /// getChatRoomId("user1", "user2") == getChatRoomId("user2", "user1")
+  /// // true - always returns "user1_user2"
+  /// ```
   String getChatRoomId(String userId1, String userId2) {
     List<String> users = [userId1, userId2];
-    users.sort();
+    users.sort(); // Ensures consistent order
     return users.join('_');
   }
 
-  // Create or get chat room (with encryption key generation)
+  /// Creates a new chat room or gets existing one
+  ///
+  /// This method handles:
+  /// 1. Checking if chat room already exists
+  /// 2. Fetching both users' public keys
+  /// 3. Generating a symmetric encryption key for this chat
+  /// 4. Encrypting the symmetric key for each participant
+  /// 5. Creating the chat room document in Firestore
+  ///
+  /// ENCRYPTION SETUP:
+  /// - If both users have public keys: End-to-end encryption enabled
+  /// - If either user lacks keys: Falls back to unencrypted chat
+  /// - Each chat has a unique AES-256 symmetric key
+  /// - Symmetric key is encrypted separately for each user with their RSA public key
+  /// - Private keys never leave the device
+  ///
+  /// Firestore Structure:
+  /// ```
+  /// chatRooms/{chatRoomId}
+  ///   ├─ participants: [userId1, userId2]
+  ///   ├─ lastMessage: String
+  ///   ├─ lastMessageTime: Timestamp
+  ///   ├─ unreadCount: {userId1: 0, userId2: 0}
+  ///   └─ encryptedSymmetricKeys: {
+  ///        userId1: "encrypted_key_for_user1",
+  ///        userId2: "encrypted_key_for_user2"
+  ///      }
+  /// ```
+  ///
+  /// Parameters:
+  /// - [userId1]: First participant's user ID
+  /// - [userId2]: Second participant's user ID
+  ///
+  /// Returns: Chat room ID (can be used to reference this chat)
+  ///
+  /// Throws: Firestore exceptions if database operation fails
   Future<String> createChatRoom(String userId1, String userId2) async {
     String chatRoomId = getChatRoomId(userId1, userId2);
 
@@ -362,9 +512,52 @@ class ChatService {
     });
   }
 
-  // Mark messages as read (optimized to avoid unnecessary writes)
+  // ========== READ RECEIPT SYSTEM ==========
+
+  /// Marks all unread messages in a chat as read
+  ///
+  /// This method implements the read receipt functionality:
+  /// 1. Checks if there are any unread messages
+  /// 2. Updates the unread count badge to 0
+  /// 3. Batch updates all unread messages to isRead: true
+  ///
+  /// PERFORMANCE OPTIMIZATIONS:
+  /// - Only runs if unreadCount > 0 (avoids unnecessary writes)
+  /// - Uses Firestore batch writes for atomic updates
+  /// - Queries only unread messages (filtered by receiverId and isRead)
+  ///
+  /// UI IMPACT:
+  /// When messages are marked as read:
+  /// - Sender sees message bubble change from gray → gradient
+  /// - Sender sees checkmark change from ✓ → ✓✓
+  /// - Unread badge on chat list decreases
+  /// - Changes sync in real-time via Firestore streams
+  ///
+  /// Firestore Operations:
+  /// ```
+  /// 1. Update: chatRooms/{id} → unreadCount.{userId} = 0
+  /// 2. Batch Update: messages where receiverId == userId AND isRead == false
+  ///    → isRead = true
+  /// ```
+  ///
+  /// Parameters:
+  /// - [chatRoomId]: ID of the chat room
+  /// - [userId]: ID of the user whose messages should be marked as read
+  ///
+  /// Called when:
+  /// - User opens a chat screen
+  /// - User is viewing chat and new messages arrive
+  ///
+  /// NOTE: This method is idempotent - safe to call multiple times
+  ///
+  /// Example:
+  /// ```dart
+  /// await chatService.markAsRead(chatRoomId, currentUserId);
+  /// // All messages sent to currentUserId in this chat are now marked read
+  /// ```
   Future<void> markAsRead(String chatRoomId, String userId) async {
     try {
+      // Fetch chat room data to check unread count
       final chatRoom = await _firestore.collection('chatRooms').doc(chatRoomId).get();
 
       if (!chatRoom.exists) return;
@@ -372,23 +565,23 @@ class ChatService {
       final data = chatRoom.data() as Map<String, dynamic>;
       final unreadCount = (data['unreadCount'] as Map<String, dynamic>?)?[userId] ?? 0;
 
-      // Only update if there are unread messages
+      // Only update if there are unread messages (performance optimization)
       if (unreadCount > 0) {
-        // Update unread count
+        // Step 1: Update unread count badge to 0
         await _firestore.collection('chatRooms').doc(chatRoomId).update({
           'unreadCount.$userId': 0,
         });
 
-        // Mark individual messages as read
+        // Step 2: Mark individual messages as read
         final messagesSnapshot = await _firestore
             .collection('chatRooms')
             .doc(chatRoomId)
             .collection('messages')
-            .where('receiverId', isEqualTo: userId)
-            .where('isRead', isEqualTo: false)
+            .where('receiverId', isEqualTo: userId) // Only messages TO this user
+            .where('isRead', isEqualTo: false) // Only unread messages
             .get();
 
-        // Use batch write for efficiency
+        // Step 3: Use batch write for atomic, efficient updates
         if (messagesSnapshot.docs.isNotEmpty) {
           final batch = _firestore.batch();
           for (var doc in messagesSnapshot.docs) {
@@ -400,6 +593,7 @@ class ChatService {
       }
     } catch (e) {
       AppLogger.error('Error marking as read', e);
+      // Don't rethrow - read receipts are not critical for app functionality
     }
   }
 
