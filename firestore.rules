@@ -177,8 +177,17 @@ service cloud.firestore {
                          // Prevent messaging blocked users
                          isNotBlocked(request.resource.data.receiverId);
 
-        // Messages are immutable
-        allow update, delete: if false;
+        // Allow receiver to mark message as read
+        allow update: if isAuthenticated() &&
+                         request.auth.uid == resource.data.receiverId &&
+                         // Only allow updating isRead field
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) &&
+                         // Can only change from false to true
+                         resource.data.isRead == false &&
+                         request.resource.data.isRead == true;
+
+        // No deletions
+        allow delete: if false;
       }
     }
 
