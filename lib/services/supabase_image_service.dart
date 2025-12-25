@@ -158,4 +158,121 @@ class SupabaseImageService {
         .from('vibenou-profiles')
         .getPublicUrl(filePath);
   }
+
+  /// Upload chat image to Supabase Storage
+  ///
+  /// Uploads images sent in chat conversations to a separate bucket/folder
+  /// from profile pictures for better organization.
+  ///
+  /// [imageFile] - The image file to upload (File or XFile)
+  /// [userId] - The ID of the user sending the image
+  /// Returns the public URL of the uploaded image
+  Future<String?> uploadChatImage(dynamic imageFile, String userId) async {
+    final supabaseClient = _supabase;
+    if (supabaseClient == null) {
+      throw Exception('Supabase is not initialized. Please configure Supabase in supabase_config.dart');
+    }
+
+    try {
+      // Generate unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final String fileName = 'chat_${userId}_$timestamp.jpg';
+      final String filePath = 'chat_images/$fileName';
+
+      // Handle both File (mobile) and XFile (web)
+      Uint8List fileBytes;
+      if (imageFile is File) {
+        fileBytes = await imageFile.readAsBytes();
+      } else if (imageFile is XFile) {
+        fileBytes = await imageFile.readAsBytes();
+      } else {
+        throw Exception('Invalid image file type');
+      }
+
+      // ===== IMAGE VALIDATION =====
+      // 1. Check file size (max 10MB for chat images)
+      const maxSizeInBytes = 10 * 1024 * 1024; // 10MB
+      if (fileBytes.length > maxSizeInBytes) {
+        final sizeInMB = (fileBytes.length / 1024 / 1024).toStringAsFixed(1);
+        throw Exception(
+          'Image is too large ($sizeInMB MB). Please choose an image smaller than 10MB.'
+        );
+      }
+
+      // 2. Check MIME type (only allow images)
+      String? mimeType;
+      if (imageFile is XFile) {
+        mimeType = imageFile.mimeType;
+      }
+
+      // Validate MIME type if available
+      if (mimeType != null) {
+        final allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+        if (!allowedTypes.contains(mimeType.toLowerCase())) {
+          throw Exception(
+            'Invalid file type. Only JPG, PNG, WebP, and GIF images are allowed.'
+          );
+        }
+      }
+
+      print('✅ Chat image validation passed: ${(fileBytes.length / 1024).toStringAsFixed(0)} KB');
+      // ===== END VALIDATION =====
+
+      // Upload file to Supabase Storage
+      await supabaseClient.storage
+          .from('vibenou-profiles') // Using same bucket, different folder
+          .uploadBinary(
+            filePath,
+            fileBytes,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: false, // Don't overwrite - each image is unique
+            ),
+          );
+
+      // Get public URL
+      final String publicUrl = supabaseClient.storage
+          .from('vibenou-profiles')
+          .getPublicUrl(filePath);
+
+      print('✅ Chat image uploaded successfully: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('❌ Error uploading chat image: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete chat image from Supabase Storage
+  ///
+  /// [imageUrl] - The public URL of the image to delete
+  Future<void> deleteChatImage(String imageUrl) async {
+    final supabaseClient = _supabase;
+    if (supabaseClient == null) {
+      throw Exception('Supabase is not initialized');
+    }
+
+    try {
+      // Extract file path from URL
+      final uri = Uri.parse(imageUrl);
+      final pathSegments = uri.pathSegments;
+
+      // Find the path after 'vibenou-profiles'
+      final bucketIndex = pathSegments.indexOf('vibenou-profiles');
+      if (bucketIndex == -1) {
+        throw Exception('Invalid image URL format');
+      }
+
+      final filePath = pathSegments.skip(bucketIndex + 1).join('/');
+
+      await supabaseClient.storage
+          .from('vibenou-profiles')
+          .remove([filePath]);
+
+      print('✅ Chat image deleted: $filePath');
+    } catch (e) {
+      print('❌ Error deleting chat image: $e');
+      rethrow;
+    }
+  }
 }

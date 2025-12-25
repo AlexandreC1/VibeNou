@@ -174,6 +174,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _changeLanguage(String languageCode) async {
     if (!mounted) return;
 
+    print('ProfileScreen: Changing language to: $languageCode');
+
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     await languageProvider.setLocale(languageCode);
 
@@ -185,6 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .collection('users')
             .doc(authService.currentUser!.uid)
             .update({'preferredLanguage': languageCode});
+        print('ProfileScreen: Updated Firestore preferredLanguage to: $languageCode');
       } catch (e) {
         print('Error updating language preference: $e');
       }
@@ -198,6 +201,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
+
+      // Force rebuild of the entire app to apply language change
+      setState(() {
+        _currentUser = _currentUser?.copyWith(preferredLanguage: languageCode);
+      });
     }
   }
 

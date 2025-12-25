@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
 import '../providers/theme_provider.dart';
+import '../providers/language_provider.dart';
 import '../utils/fix_user_profile.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -47,6 +48,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     final authService = Provider.of<AuthService>(context, listen: false);
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
 
     // Check if user is logged in
     if (authService.currentUser != null) {
@@ -57,10 +59,16 @@ class _SplashScreenState extends State<SplashScreen>
         print('Note: Profile fix attempted: $e');
       }
 
-      // Load user data and set theme
+      // Load user data and set theme + language
       final userData = await authService.getUserData(authService.currentUser!.uid);
       if (userData != null) {
         themeProvider.updateTheme(userData);
+
+        // Set user's preferred language
+        if (userData.preferredLanguage.isNotEmpty) {
+          print('SplashScreen: Setting language from user data: ${userData.preferredLanguage}');
+          await languageProvider.setLocale(userData.preferredLanguage);
+        }
       }
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/main');

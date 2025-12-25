@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/chat_message.dart';
 import '../../models/user_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/profile_view_service.dart';
+import '../../services/supabase_image_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/report_dialog.dart';
 import '../../widgets/image_gallery_viewer.dart';
 
@@ -27,9 +30,11 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
+  final SupabaseImageService _imageService = SupabaseImageService();
   final TextEditingController _messageController = TextEditingController();
   String? _chatRoomId;
   bool _isSending = false;
+  bool _isUploadingImage = false;
   Timer? _typingTimer;
   bool _isTyping = false;
 
@@ -145,6 +150,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() => _isSending = true);
 
+    // Haptic feedback when tapping send
+    HapticFeedbackUtil.mediumImpact();
+
     try {
       await _chatService.sendMessage(
         chatRoomId: _chatRoomId!,
@@ -152,7 +160,11 @@ class _ChatScreenState extends State<ChatScreen> {
         receiverId: widget.otherUser.uid,
         message: message,
       );
+      // Success haptic feedback
+      HapticFeedbackUtil.success();
     } catch (e) {
+      // Error haptic feedback
+      HapticFeedbackUtil.error();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -163,6 +175,152 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } finally {
       setState(() => _isSending = false);
+    }
+  }
+
+  /// Shows image source selection dialog (camera or gallery)
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Send Image',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: Colors.white),
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Use camera to take a new photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndSendImage(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.purpleGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library, color: Colors.white),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Select an existing photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndSendImage(ImageSource.gallery);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Pick image from specified source and send as message
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    if (_chatRoomId == null) return;
+
+    setState(() => _isUploadingImage = true);
+
+    try {
+      // Pick image
+      XFile? imageFile;
+      if (source == ImageSource.camera) {
+        imageFile = await _imageService.pickImageFromCamera();
+      } else {
+        imageFile = await _imageService.pickImageFromGallery();
+      }
+
+      if (imageFile == null) {
+        // User cancelled
+        setState(() => _isUploadingImage = false);
+        return;
+      }
+
+      // Upload to Supabase
+      final imageUrl = await _imageService.uploadChatImage(
+        imageFile,
+        widget.currentUser.uid,
+      );
+
+      if (imageUrl == null) {
+        throw Exception('Failed to upload image');
+      }
+
+      // Send message with image URL
+      await _chatService.sendMessage(
+        chatRoomId: _chatRoomId!,
+        senderId: widget.currentUser.uid,
+        receiverId: widget.otherUser.uid,
+        message: '[Image]', // Placeholder text
+        imageUrl: imageUrl,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image sent successfully'),
+            backgroundColor: AppTheme.teal,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error sending image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send image: ${e.toString()}'),
+            backgroundColor: AppTheme.coral,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
     }
   }
 
@@ -433,6 +591,30 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Row(
           children: [
+            // Image picker button
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.borderColor, width: 1.5),
+              ),
+              child: IconButton(
+                icon: _isUploadingImage
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppTheme.primaryRose),
+                        ),
+                      )
+                    : const Icon(Icons.image, color: AppTheme.primaryRose),
+                onPressed: _isUploadingImage ? null : _showImageSourceDialog,
+                tooltip: 'Send Image',
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: TextField(
                 controller: _messageController,
@@ -542,21 +724,117 @@ class _MessageBubble extends StatelessWidget {
               crossAxisAlignment:
                   isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: getBubbleDecoration(),
-                  child: Text(
-                    message.displayMessage,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : AppTheme.textPrimary,
-                      fontSize: 15,
+                // Message bubble (text or image)
+                if (message.imageUrl != null)
+                  // Image message
+                  GestureDetector(
+                    onTap: () {
+                      // Open image in fullscreen gallery
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ImageGalleryViewer(
+                            imageUrls: [message.imageUrl!],
+                            initialIndex: 0,
+                            userName: '', // Could be sender name
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.65,
+                        maxHeight: 300,
+                      ),
+                      decoration: getBubbleDecoration(),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20).copyWith(
+                          bottomRight: isMe
+                              ? const Radius.circular(4)
+                              : const Radius.circular(20),
+                          bottomLeft: !isMe
+                              ? const Radius.circular(4)
+                              : const Radius.circular(20),
+                        ),
+                        child: Stack(
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: message.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                height: 200,
+                                color: AppTheme.backgroundColor,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppTheme.primaryRose,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                height: 200,
+                                color: AppTheme.backgroundColor,
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image,
+                                      size: 48,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Failed to load image',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Fullscreen icon overlay
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.fullscreen,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  // Text message
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: getBubbleDecoration(),
+                    child: Text(
+                      message.displayMessage,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 4),
+                // Timestamp and read status
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

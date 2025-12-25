@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -11,6 +11,8 @@ import 'utils/firebase_options.dart';
 import 'utils/supabase_config.dart';
 import 'utils/app_logger.dart';
 import 'services/notification_service.dart';
+import 'services/error_telemetry_service.dart';
+import 'services/captcha_service.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
@@ -30,6 +32,14 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Firebase Crashlytics for error tracking
+  await ErrorTelemetryService.initialize();
+  AppLogger.info('Crashlytics initialized');
+
+  // Initialize Firebase App Check for bot protection
+  await CaptchaService.initialize();
+  AppLogger.info('App Check initialized');
 
   // Set up background message handler for FCM
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -56,7 +66,20 @@ void main() async {
     AppLogger.info('Image uploads will use Firebase Storage instead.');
   }
 
-  runApp(const MyApp());
+  // Run app with error zone to catch all errors
+  runZonedGuarded(
+    () => runApp(const MyApp()),
+    (error, stackTrace) {
+      // Log fatal errors to Crashlytics
+      ErrorTelemetryService.logError(
+        error,
+        stackTrace,
+        fatal: true,
+        reason: 'Uncaught error in app zone',
+      );
+      AppLogger.error('Uncaught error', error, stackTrace);
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -95,10 +118,6 @@ class MyApp extends StatelessWidget {
           Locale('ht', ''), // Haitian Creole
         ],
         localeResolutionCallback: (locale, supportedLocales) {
-          // If Haitian Creole is selected, fallback to French for Material widgets
-          if (locale?.languageCode == 'ht') {
-            return const Locale('fr', '');
-          }
           // Check if the current locale is supported
           for (var supportedLocale in supportedLocales) {
             if (supportedLocale.languageCode == locale?.languageCode) {

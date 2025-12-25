@@ -1,0 +1,88 @@
+name: Build Android App
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Create .env file from secrets
+      run: |
+        cat << EOF > .env
+        # Firebase Configuration - Android
+        FIREBASE_API_KEY_ANDROID=${{ secrets.FIREBASE_API_KEY_ANDROID }}
+        FIREBASE_APP_ID_ANDROID=${{ secrets.FIREBASE_APP_ID_ANDROID }}
+
+        # Firebase Configuration - iOS
+        FIREBASE_API_KEY_IOS=${{ secrets.FIREBASE_API_KEY_IOS }}
+        FIREBASE_APP_ID_IOS=${{ secrets.FIREBASE_APP_ID_IOS }}
+        FIREBASE_IOS_BUNDLE_ID=${{ secrets.FIREBASE_IOS_BUNDLE_ID }}
+
+        # Firebase Configuration - Web
+        FIREBASE_API_KEY_WEB=${{ secrets.FIREBASE_API_KEY_WEB }}
+        FIREBASE_APP_ID_WEB=${{ secrets.FIREBASE_APP_ID_WEB }}
+        FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
+
+        # Firebase Configuration - Shared
+        FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+        FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+        FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+
+        # OAuth Configuration
+        GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
+
+        # Supabase Configuration
+        SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+        EOF
+
+    - name: Verify .env file created
+      run: |
+        if [ ! -f .env ]; then
+          echo "Error: .env file not created"
+          exit 1
+        fi
+        echo ".env file created successfully"
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Run analyzer
+      run: flutter analyze
+
+    - name: Run tests
+      run: flutter test
+
+    - name: Build APK
+      run: flutter build apk --release
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: build/app/outputs/flutter-apk/app-release.apk
+
+    - name: Clean up .env file
+      if: always()
+      run: rm -f .env

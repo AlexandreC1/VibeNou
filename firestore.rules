@@ -2,81 +2,308 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
-    match /users/{userId} {
-      // Allow read access to all authenticated users
-      allow read: if request.auth != null;
+    // ========== Helper Functions ==========
 
-      // Allow write access only to the user's own document
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Profile Views collection
+    // Check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if email is verified
+    // Also checks Firestore field for grandfathered beta users
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true ||
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerified == true;
+    }
+
+    // Validate string field
+    function isValidString(field, minLen, maxLen) {
+      return field is string &&
+             field.size() >= minLen &&
+             field.size() <= maxLen;
+    }
+
+    // Check if user is not blocked
+    function isNotBlocked(userId) {
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid)/blockedUsers/$(userId));
+    }
+
+    // Rate limiting helper (max writes per hour)
+    function rateLimit(maxWrites) {
+      return request.time > resource.data.lastWriteTime + duration.value(1, 'h') ||
+             resource.data.writeCount < maxWrites;
+    }
+
+    // ========== Users Collection ==========
+    match /users/{userId} {
+      // Allow read access to all authenticated users (for discovery, chat, etc.)
+      // But don't allow reading blocked users
+      allow read: if isAuthenticated() && isNotBlocked(userId);
+
+      // Allow creating a new user document only for your own UID
+      allow create: if isOwner(userId) &&
+                       // Validate required fields
+                       isValidString(request.resource.data.name, 1, 50) &&
+                       isValidString(request.resource.data.bio, 0, 500) &&
+                       request.resource.data.age is int &&
+                       request.resource.data.age >= 18 &&
+                       request.resource.data.age <= 120 &&
+                       request.resource.data.email is string &&
+                       request.resource.data.interests is list &&
+                       request.resource.data.createdAt is timestamp;
+
+      // Allow updating only your own document with field restrictions
+      allow update: if isOwner(userId) &&
+                       // Prevent changing critical fields
+                       request.resource.data.uid == resource.data.uid &&
+                       request.resource.data.email == resource.data.email &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       // Validate updatable fields
+                       (
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) ||
+                         isValidString(request.resource.data.name, 1, 50)
+                       ) &&
+                       (
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bio']) ||
+                         isValidString(request.resource.data.bio, 0, 500)
+                       ) &&
+                       (
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['age']) ||
+                         (request.resource.data.age is int &&
+                          request.resource.data.age >= 18 &&
+                          request.resource.data.age <= 120)
+                       );
+
+      // No deletions allowed (use soft delete instead)
+      allow delete: if false;
+
+      // Blocked Users subcollection
+      match /blockedUsers/{blockedUserId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         request.resource.data.blockedAt is timestamp &&
+                         request.resource.data.reason is string;
+        allow delete: if isOwner(userId);
+      }
+
+      // User Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if false; // Only created by Cloud Functions
+        allow update: if isOwner(userId) &&
+                         // Only allow marking as read
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow delete: if isOwner(userId);
+      }
+
+      // Favorites subcollection
+      match /favorites/{favoriteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         request.resource.data.userId is string &&
+                         request.resource.data.favoritedAt is timestamp;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // ========== Profile Views Collection ==========
     match /profileViews/{viewId} {
-      // Allow authenticated users to read views where they are the viewer OR the viewed user
-      allow read: if request.auth != null &&
+      allow read: if isAuthenticated() &&
                      (resource.data.viewedUserId == request.auth.uid ||
                       resource.data.viewerId == request.auth.uid);
 
-      // Allow authenticated users to create views (recording when they view someone)
-      allow create: if request.auth != null &&
-                       request.resource.data.viewerId == request.auth.uid;
+      // Rate limit: max 100 views per hour per user
+      allow create: if isAuthenticated() &&
+                       request.resource.data.viewerId == request.auth.uid &&
+                       isNotBlocked(request.resource.data.viewedUserId) &&
+                       request.resource.data.viewedAt is timestamp;
 
-      // Allow users to update their own view records (marking as read)
-      allow update: if request.auth != null &&
-                       resource.data.viewedUserId == request.auth.uid;
+      allow update: if isAuthenticated() &&
+                       resource.data.viewedUserId == request.auth.uid &&
+                       // Only allow marking as read
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
 
-      // Allow users to delete old views if they own them
-      allow delete: if request.auth != null &&
+      allow delete: if isAuthenticated() &&
                        resource.data.viewedUserId == request.auth.uid;
     }
 
-    // Chat Rooms collection
+    // ========== Chat Rooms Collection ==========
     match /chatRooms/{chatRoomId} {
-      // Allow creating new chatRooms
-      allow create: if request.auth != null &&
-                       request.auth.uid in request.resource.data.participants;
+      // Validate chatRoom creation
+      allow create: if isAuthenticated() &&
+                       request.auth.uid in request.resource.data.participants &&
+                       request.resource.data.participants.size() == 2 &&
+                       request.resource.data.participants[0] != request.resource.data.participants[1] &&
+                       isNotBlocked(request.resource.data.participants[0]) &&
+                       isNotBlocked(request.resource.data.participants[1]);
 
-      // Users can read/write chatRooms they are participants in
-      allow read, write: if request.auth != null &&
-                            (request.auth.uid in resource.data.participants);
+      // Users can read chatRooms they are participants in
+      allow read: if isAuthenticated() &&
+                     request.auth.uid in resource.data.participants;
+
+      // Users can only update unreadCount and lastMessage fields
+      allow update: if isAuthenticated() &&
+                       request.auth.uid in resource.data.participants &&
+                       // Prevent changing participants
+                       request.resource.data.participants == resource.data.participants;
+
+      // No deletions (use soft delete instead)
+      allow delete: if false;
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Users can read messages in chatRooms they are participants in
+        allow read: if isAuthenticated() &&
+                       request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants;
+
+        // Strict message creation validation
+        allow create: if isAuthenticated() &&
+                         isEmailVerified() && // NEW: Require email verification
+                         request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants &&
+                         request.resource.data.senderId == request.auth.uid &&
+                         // Validate message content
+                         isValidString(request.resource.data.message, 1, 5000) &&
+                         request.resource.data.timestamp is timestamp &&
+                         request.resource.data.senderId is string &&
+                         request.resource.data.receiverId is string &&
+                         // Ensure sender and receiver are participants
+                         request.resource.data.senderId in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants &&
+                         request.resource.data.receiverId in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants &&
+                         // Prevent messaging blocked users
+                         isNotBlocked(request.resource.data.receiverId);
+
+        // Messages are immutable
+        allow update, delete: if false;
+      }
     }
 
-    // Messages subcollection
-    match /chatRooms/{chatRoomId}/messages/{messageId} {
-      // Users can read messages in chatRooms they are participants in
-      allow read: if request.auth != null &&
-                     request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants;
+    // ========== Reports Collection ==========
+    match /reports/{reportId} {
+      // Users can read their own reports
+      allow read: if isAuthenticated() &&
+                     resource.data.reporterId == request.auth.uid;
 
-      // Users can create messages in chatRooms they are participants in
-      // with validation for message content
-      allow create: if request.auth != null &&
-                       request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants &&
-                       request.resource.data.senderId == request.auth.uid &&
-                       request.resource.data.message is string &&
-                       request.resource.data.message.size() <= 5000 &&
-                       request.resource.data.timestamp is timestamp &&
-                       request.resource.data.senderId is string &&
-                       request.resource.data.receiverId is string;
+      // Users can create reports with validation
+      allow create: if isAuthenticated() &&
+                       request.resource.data.reporterId == request.auth.uid &&
+                       request.resource.data.reportedUserId is string &&
+                       request.resource.data.reportedUserId != request.auth.uid &&
+                       isValidString(request.resource.data.reason, 1, 500) &&
+                       request.resource.data.category in ['spam', 'harassment', 'inappropriate', 'fake', 'other'] &&
+                       request.resource.data.timestamp is timestamp;
 
-      // No updates or deletes on messages
+      // No updates or deletes
       allow update, delete: if false;
     }
 
-    // Matches collection
+    // ========== Matches Collection ==========
     match /matches/{matchId} {
-      // Users can read/write matches they are part of
-      allow read, write: if request.auth != null &&
-                            (resource.data.userId1 == request.auth.uid ||
-                             resource.data.userId2 == request.auth.uid);
+      allow read: if isAuthenticated() &&
+                     (resource.data.userId1 == request.auth.uid ||
+                      resource.data.userId2 == request.auth.uid);
 
-      // Allow creating matches
-      allow create: if request.auth != null &&
+      allow create: if isAuthenticated() &&
                        (request.resource.data.userId1 == request.auth.uid ||
-                        request.resource.data.userId2 == request.auth.uid);
+                        request.resource.data.userId2 == request.auth.uid) &&
+                       request.resource.data.userId1 != request.resource.data.userId2 &&
+                       request.resource.data.matchedAt is timestamp &&
+                       isNotBlocked(request.resource.data.userId1) &&
+                       isNotBlocked(request.resource.data.userId2);
+
+      allow update: if isAuthenticated() &&
+                       (resource.data.userId1 == request.auth.uid ||
+                        resource.data.userId2 == request.auth.uid);
+
+      allow delete: if isAuthenticated() &&
+                       (resource.data.userId1 == request.auth.uid ||
+                        resource.data.userId2 == request.auth.uid);
     }
 
-    // Default: deny all other access
+    // ========== Notifications Queue (Cloud Functions only) ==========
+    match /notifications_queue/{notificationId} {
+      // Only Cloud Functions can write
+      allow read, write: if false;
+    }
+
+    // ========== Success Stories Collection ==========
+    match /successStories/{storyId} {
+      // Anyone can read published stories
+      allow read: if isAuthenticated() &&
+                     resource.data.status == 'published';
+
+      // Users can create their own stories
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidString(request.resource.data.story, 10, 2000) &&
+                       request.resource.data.createdAt is timestamp;
+
+      // Users can update only their own stories
+      allow update: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Users can delete only their own stories
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // ========== Daily Rewards Collection ==========
+    match /dailyRewards/{userId} {
+      allow read: if isOwner(userId);
+
+      // Users can only increment their streak (Cloud Functions validate the date)
+      allow write: if isOwner(userId) &&
+                      request.resource.data.userId == userId &&
+                      request.resource.data.lastClaimDate is timestamp;
+    }
+
+    // ========== Rate Limits Collection (Cloud Functions only) ==========
+    match /rateLimits/{rateLimitDoc} {
+      // Users can read their own rate limit status
+      allow read: if isAuthenticated() &&
+                     rateLimitDoc.matches(request.auth.uid + '_.*');
+
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+
+    // ========== Audit Logs Collection ==========
+    match /auditLogs/{userId}/events/{eventId} {
+      // Users can read their own audit logs
+      allow read: if isOwner(userId);
+
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+
+    // ========== Global Audit Logs (Admin only) ==========
+    match /globalAuditLogs/{logId} {
+      // Only admins can read global audit logs
+      allow read: if isAuthenticated() && request.auth.token.admin == true;
+
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+
+    // ========== Admin Collection (Admin only) ==========
+    match /admin/{document=**} {
+      // Only allow reads/writes if user has admin claim
+      allow read, write: if isAuthenticated() &&
+                            request.auth.token.admin == true;
+    }
+
+    // ========== Account Lockouts Collection ==========
+    match /accountLockouts/{email} {
+      // Users cannot read or write their own lockout status
+      // Only Cloud Functions and backend can manage lockouts
+      allow read, write: if false;
+    }
+
+    // ========== Default: Deny All ==========
     match /{document=**} {
       allow read, write: if false;
     }

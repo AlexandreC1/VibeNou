@@ -9,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/user_cache_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/haptic_feedback_util.dart';
 import '../chat/chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -110,9 +111,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 return const Center(child: Text('Error loading current user'));
               }
 
-              return ListView.builder(
-                itemCount: chatRooms.length,
-                itemBuilder: (context, index) {
+              return RefreshIndicator(
+                onRefresh: () async {
+                  HapticFeedbackUtil.mediumImpact();
+                  // Stream auto-updates, so just provide haptic feedback
+                  await Future.delayed(const Duration(milliseconds: 500));
+                },
+                child: ListView.builder(
+                  itemCount: chatRooms.length,
+                  itemBuilder: (context, index) {
                   final chatRoom = chatRooms[index];
                   final otherUserId = chatRoom.participants.firstWhere(
                     (id) => id != authService.currentUser!.uid,
@@ -161,7 +168,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ),
                   );
                 },
-              );
+              ),
+            );
             },
           );
         },

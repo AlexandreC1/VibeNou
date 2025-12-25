@@ -6,7 +6,6 @@ import '../../models/user_model.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
-import '../../widgets/user_card.dart';
 
 class WhoViewedMeScreen extends StatefulWidget {
   const WhoViewedMeScreen({super.key});
@@ -52,7 +51,8 @@ class _WhoViewedMeScreenState extends State<WhoViewedMeScreen> {
         backgroundColor: AppTheme.royalPurple,
       ),
       body: StreamBuilder<List<ProfileView>>(
-        stream: _profileViewService.getProfileViews(authService.currentUser!.uid),
+        stream:
+            _profileViewService.getProfileViews(authService.currentUser!.uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -191,7 +191,9 @@ class _WhoViewedMeScreenState extends State<WhoViewedMeScreen> {
                             // View indicator
                             Icon(
                               Icons.remove_red_eye,
-                              color: view.isRead ? Colors.grey : AppTheme.royalPurple,
+                              color: view.isRead
+                                  ? Colors.grey
+                                  : AppTheme.royalPurple,
                               size: 20,
                             ),
                           ],

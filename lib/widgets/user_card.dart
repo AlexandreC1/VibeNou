@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/user_model.dart';
 import '../utils/app_theme.dart';
+import '../utils/haptic_feedback_util.dart';
 
 class UserCard extends StatefulWidget {
   final UserModel user;
@@ -25,7 +26,10 @@ class _UserCardState extends State<UserCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+        HapticFeedbackUtil.mediumImpact(); // Satisfying tap feedback
+      },
       onTapUp: (_) {
         setState(() => _isPressed = false);
         widget.onTap();

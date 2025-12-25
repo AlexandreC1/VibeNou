@@ -139,7 +139,13 @@ class AppLocalizations {
   };
 
   String translate(String key) {
-    return _localizedValues[locale.languageCode]?[key] ?? key;
+    // Debug: Print current locale for troubleshooting
+    // print('AppLocalizations: locale=${locale.languageCode}, key=$key');
+    final value = _localizedValues[locale.languageCode]?[key];
+    if (value == null) {
+      print('WARNING: Missing translation for key "$key" in locale "${locale.languageCode}"');
+    }
+    return value ?? key;
   }
 
   String get appName => translate('app_name');

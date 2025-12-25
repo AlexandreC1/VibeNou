@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,8 +9,12 @@ import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../services/location_service.dart';
 import '../../services/profile_view_service.dart';
+import '../../services/online_presence_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/user_card.dart';
+import '../../widgets/image_gallery_viewer.dart';
+import '../../widgets/online_counter_widget.dart';
 import '../chat/chat_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -24,6 +29,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   late TabController _tabController;
   final UserService _userService = UserService();
   final LocationService _locationService = LocationService();
+  final OnlinePresenceService _presenceService = OnlinePresenceService();
   final TextEditingController _searchController = TextEditingController();
 
   List<UserModel> _nearbyUsers = [];
@@ -112,6 +118,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (authService.currentUser != null) {
       final user = await authService.getUserData(authService.currentUser!.uid);
       print('DEBUG: Current user loaded: ${user?.name}, Location: ${user?.location}');
+
+      // Update online presence
+      await _presenceService.updatePresence(authService.currentUser!.uid);
+
       if (mounted) {
         setState(() {
           _currentUser = user;
@@ -377,6 +387,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     ),
                   ),
                 ],
+              ),
+            ),
+            // Online Counter - Social Proof Element
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: OnlineCounterWidget(),
               ),
             ),
             // Tab Content
@@ -758,7 +777,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _loadNearbyUsers,
+      onRefresh: () async {
+        HapticFeedbackUtil.mediumImpact();
+        await _loadNearbyUsers();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _filteredNearbyUsers.length,
@@ -948,7 +970,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _loadSimilarUsers,
+      onRefresh: () async {
+        HapticFeedbackUtil.mediumImpact();
+        await _loadSimilarUsers();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _filteredSimilarUsers.length,
@@ -1042,45 +1067,74 @@ class _UserProfileSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile picture with gradient border
+                  // Profile picture with gradient border (tap to view full size)
                   Center(
-                    child: Hero(
-                      tag: 'user_${user.uid}',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppTheme.sunsetGradient,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryRose.withValues(alpha: 0.4),
-                              blurRadius: 25,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(5),
+                    child: GestureDetector(
+                      onTap: () => _showImageGallery(context),
+                      child: Hero(
+                        tag: 'user_${user.uid}',
                         child: Container(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white,
+                            gradient: AppTheme.sunsetGradient,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryRose.withValues(alpha: 0.4),
+                                blurRadius: 25,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          padding: const EdgeInsets.all(3),
-                          child: CircleAvatar(
-                            radius: 70,
-                            backgroundColor: AppTheme.primaryRose,
-                            backgroundImage: user.photoUrl != null
-                                ? CachedNetworkImageProvider(user.photoUrl!)
-                                : null,
-                            child: user.photoUrl == null
-                                ? Text(
-                                    user.name[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 56,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                          padding: const EdgeInsets.all(5),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 70,
+                                  backgroundColor: AppTheme.primaryRose,
+                                  backgroundImage: user.photoUrl != null
+                                      ? CachedNetworkImageProvider(user.photoUrl!)
+                                      : null,
+                                  child: user.photoUrl == null
+                                      ? Text(
+                                          user.name[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 56,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                // Visual indicator that the image is tappable
+                                if (user.photoUrl != null || user.photos.isNotEmpty)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.primaryGradient,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.fullscreen,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
                                     ),
-                                  )
-                                : null,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1391,5 +1445,47 @@ class _UserProfileSheet extends StatelessWidget {
 
   void _showReportDialog(BuildContext context, UserModel user) {
     // This will be implemented in the report dialog widget
+  }
+
+  /// Opens the image gallery viewer to display user's photos
+  ///
+  /// Collects all available photos (main photo + additional photos)
+  /// and opens them in a fullscreen gallery with swipe navigation
+  void _showImageGallery(BuildContext context) {
+    // Collect all available photos
+    List<String> allPhotos = [];
+
+    // Add main photo if available
+    if (user.photoUrl != null) {
+      allPhotos.add(user.photoUrl!);
+    }
+
+    // Add additional photos from gallery
+    allPhotos.addAll(user.photos);
+
+    // Remove duplicates (in case photoUrl is also in photos list)
+    allPhotos = allPhotos.toSet().toList();
+
+    if (allPhotos.isEmpty) {
+      // No photos available
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No photos available'),
+          backgroundColor: AppTheme.coral,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageGalleryViewer(
+          imageUrls: allPhotos,
+          initialIndex: 0,
+          userName: user.name,
+        ),
+      ),
+    );
   }
 }

@@ -22,7 +22,8 @@
       "Bash(firebase deploy:*)",
       "Bash(npx firebase deploy:*)",
       "Bash(firebase projects:list:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

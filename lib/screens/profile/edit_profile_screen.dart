@@ -9,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_image_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/haptic_feedback_util.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -280,6 +281,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
     setState(() => _isLoading = true);
 
+    // Haptic feedback when saving
+    HapticFeedbackUtil.mediumImpact();
+
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -313,6 +317,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       await authService.updateUserProfile(updatedUser);
 
+      // Success haptic feedback
+      HapticFeedbackUtil.success();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -323,6 +330,9 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         Navigator.pop(context, true);
       }
     } catch (e) {
+      // Error haptic feedback
+      HapticFeedbackUtil.error();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -346,9 +356,6 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     final gradient = widget.currentUser.gender == 'male'
         ? AppTheme.primaryBlueGradient
         : AppTheme.primaryGradient;
-    final accentColor = widget.currentUser.gender == 'male'
-        ? AppTheme.primaryBlue
-        : AppTheme.primaryRose;
 
     return Scaffold(
       appBar: AppBar(
@@ -392,16 +399,16 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildBasicInfoTab(localizations),
-          _buildInterestsTab(localizations),
-          _buildPhotosTab(localizations),
+          _buildBasicInfoTab(localizations, gradient),
+          _buildInterestsTab(localizations, gradient),
+          _buildPhotosTab(localizations, gradient),
           _buildPreferencesTab(localizations),
         ],
       ),
     );
   }
 
-  Widget _buildBasicInfoTab(AppLocalizations localizations) {
+  Widget _buildBasicInfoTab(AppLocalizations localizations, Gradient gradient) {
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
@@ -657,7 +664,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     );
   }
 
-  Widget _buildInterestsTab(AppLocalizations localizations) {
+  Widget _buildInterestsTab(AppLocalizations localizations, Gradient gradient) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -733,7 +740,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
     );
   }
 
-  Widget _buildPhotosTab(AppLocalizations localizations) {
+  Widget _buildPhotosTab(AppLocalizations localizations, Gradient gradient) {
     final totalPhotos = _photos.length + _newPhotoFiles.length;
 
     return SingleChildScrollView(

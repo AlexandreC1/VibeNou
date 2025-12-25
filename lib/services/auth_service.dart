@@ -7,12 +7,18 @@ import '../utils/app_logger.dart';
 import 'encryption_service.dart';
 import 'key_storage_service.dart';
 import 'notification_service.dart';
+import 'email_verification_service.dart';
+import 'error_telemetry_service.dart';
+import 'account_lockout_service.dart';
+import 'captcha_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final GoogleSignIn _googleSignIn;
   final NotificationService _notificationService = NotificationService();
+  final EmailVerificationService _emailVerificationService = EmailVerificationService();
+  final AccountLockoutService _lockoutService = AccountLockoutService();
 
   AuthService({
     FirebaseAuth? auth,
@@ -42,6 +48,13 @@ class AuthService {
     String preferredLanguage = 'en',
     String? gender,
   }) async {
+    // Verify user is human (bot prevention)
+    final isHuman = await CaptchaService.verifySignup();
+    if (!isHuman) {
+      AppLogger.warning('Signup blocked: Failed bot detection for $email');
+      throw Exception('Signup verification failed. Please try again.');
+    }
+
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -86,6 +99,15 @@ class AuthService {
             .doc(user.uid)
             .set(userModel.toMap());
 
+        // Send email verification
+        try {
+          await _emailVerificationService.sendVerificationEmail();
+          AppLogger.info('Verification email sent to $email');
+        } catch (e) {
+          AppLogger.warning('Failed to send verification email: $e');
+          // Don't throw - allow signup to complete even if email fails
+        }
+
         return userModel;
       }
     } catch (e) {
@@ -100,6 +122,13 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Check account lockout status first
+    final lockoutStatus = await _lockoutService.checkLockout(email);
+    if (lockoutStatus.isLocked) {
+      AppLogger.warning('Login attempt on locked account: $email');
+      throw LockoutException(lockoutStatus);
+    }
+
     try {
       print('DEBUG: Attempting sign in for email: $email');
       UserCredential result = await _auth.signInWithEmailAndPassword(
@@ -109,6 +138,9 @@ class AuthService {
 
       User? user = result.user;
       print('DEBUG: Firebase Auth successful. User ID: ${user?.uid}');
+
+      // Reset lockout on successful login
+      await _lockoutService.resetLockout(email);
 
       if (user != null) {
         // Check if user document exists
@@ -164,12 +196,36 @@ class AuthService {
           // Continue anyway - not critical
         }
 
+        // Set user context in Crashlytics for error tracking
+        try {
+          await ErrorTelemetryService.setUser(user.uid, email: email);
+        } catch (crashlyticsError) {
+          AppLogger.warning('Failed to set Crashlytics user: $crashlyticsError');
+          // Continue anyway - not critical
+        }
+
         print('DEBUG: Returning user model from existing document');
         return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
       }
     } catch (e) {
       print('ERROR: Sign in failed: $e');
       print('ERROR: Error type: ${e.runtimeType}');
+
+      // Record failed login attempt if it's a wrong password/email error
+      if (e is FirebaseAuthException &&
+          (e.code == 'wrong-password' ||
+           e.code == 'user-not-found' ||
+           e.code == 'invalid-email' ||
+           e.code == 'invalid-credential')) {
+        final lockoutStatus = await _lockoutService.recordFailedAttempt(email);
+        AppLogger.warning('Failed login for $email: ${lockoutStatus.attemptsRemaining} attempts remaining');
+
+        // If account is now locked, throw LockoutException
+        if (lockoutStatus.isLocked) {
+          throw LockoutException(lockoutStatus);
+        }
+      }
+
       rethrow;
     }
     return null;
@@ -263,6 +319,14 @@ class AuthService {
           print('Error updating last active: $e');
           // Continue with sign out even if this fails
         }
+
+        // Clear user context in Crashlytics
+        try {
+          await ErrorTelemetryService.clearUser();
+        } catch (e) {
+          AppLogger.warning('Error clearing Crashlytics user: $e');
+          // Continue with sign out
+        }
       }
 
       // Only sign out from Google if user signed in with Google
@@ -312,5 +376,17 @@ class AuthService {
       print('Reset password error: $e');
       rethrow;
     }
+  }
+}
+
+/// Exception thrown when account is locked
+class LockoutException implements Exception {
+  final LockoutStatus lockoutStatus;
+
+  LockoutException(this.lockoutStatus);
+
+  @override
+  String toString() {
+    return lockoutStatus.getMessage();
   }
 }
