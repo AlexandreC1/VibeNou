@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -9,6 +10,7 @@ import '../../models/user_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/supabase_image_service.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/report_dialog.dart';
@@ -59,7 +61,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Mark messages as read
       await _chatService.markAsRead(chatRoomId, widget.currentUser.uid);
     } catch (e) {
-      print('ERROR initializing chat: $e');
+      AppLogger.error('Error initializing chat', e);
       if (mounted) {
         // Still set chat room ID to show UI even if mark as read fails
         final chatRoomId = _chatService.getChatRoomId(
@@ -257,6 +259,99 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Shows image preview dialog with caption input
+  Future<String?> _showImagePreviewDialog(XFile imageFile) async {
+    final TextEditingController captionController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 600),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              const Text(
+                'Send Image',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Image Preview
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(imageFile.path),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Caption input
+              TextField(
+                controller: captionController,
+                decoration: InputDecoration(
+                  hintText: 'Add a caption...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppTheme.borderColor),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                maxLines: 3,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 16),
+
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, null),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, captionController.text.trim()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryRose,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text('Send'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Pick image from specified source and send as message
   Future<void> _pickAndSendImage(ImageSource source) async {
     if (_chatRoomId == null) return;
@@ -278,6 +373,15 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
+      // Show image preview with caption input
+      final caption = await _showImagePreviewDialog(imageFile);
+
+      if (caption == null) {
+        // User cancelled sending
+        setState(() => _isUploadingImage = false);
+        return;
+      }
+
       // Upload to Supabase
       final imageUrl = await _imageService.uploadChatImage(
         imageFile,
@@ -288,12 +392,12 @@ class _ChatScreenState extends State<ChatScreen> {
         throw Exception('Failed to upload image');
       }
 
-      // Send message with image URL
+      // Send message with image URL and caption
       await _chatService.sendMessage(
         chatRoomId: _chatRoomId!,
         senderId: widget.currentUser.uid,
         receiverId: widget.otherUser.uid,
-        message: '[Image]', // Placeholder text
+        message: caption.isEmpty ? '[Image]' : caption,
         imageUrl: imageUrl,
       );
 
@@ -307,7 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } catch (e) {
-      print('❌ Error sending image: $e');
+      AppLogger.error('Error sending image', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
