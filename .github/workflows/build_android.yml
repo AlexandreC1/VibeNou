@@ -1,10 +1,7 @@
 name: Build Android App
 
+# Only run manually to avoid build failures when secrets aren't configured
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
