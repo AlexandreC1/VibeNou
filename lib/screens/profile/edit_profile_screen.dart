@@ -13,10 +13,12 @@ import '../../utils/haptic_feedback_util.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel currentUser;
+  final int initialTab;
 
   const EditProfileScreen({
     super.key,
     required this.currentUser,
+    this.initialTab = 0,
   });
 
   @override
@@ -75,7 +77,11 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTab,
+    );
     _nameController = TextEditingController(text: widget.currentUser.name);
     _bioController = TextEditingController(text: widget.currentUser.bio);
     _ageController =

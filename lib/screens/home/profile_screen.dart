@@ -176,10 +176,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     print('ProfileScreen: Changing language to: $languageCode');
 
+    if (!mounted) return;
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     await languageProvider.setLocale(languageCode);
 
     // Update user preference in Firestore
+    if (!mounted) return;
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {
       try {
@@ -624,8 +626,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 elevation: 4,
                 child: InkWell(
                   onTap: () {
-                    _showEditProfile();
-                    // TODO: Navigate directly to photos tab if we keep tabs
+                    _showEditProfile(initialTab: 2); // Navigate to Photos tab (index 2)
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -891,7 +892,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _showEditProfile() async {
+  Future<void> _showEditProfile({int initialTab = 0}) async {
     if (_currentUser == null) return;
 
     final result = await Navigator.push(
@@ -899,6 +900,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(
         builder: (context) => EditProfileScreen(
           currentUser: _currentUser!,
+          initialTab: initialTab,
         ),
       ),
     );
