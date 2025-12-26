@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/report_model.dart';
+import '../utils/app_logger.dart';
 
 class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,7 +24,7 @@ class ReportService {
 
       await _firestore.collection('reports').add(report.toMap());
     } catch (e) {
-      print('Error submitting report: $e');
+      AppLogger.info('Error submitting report: $e');
       rethrow;
     }
   }
@@ -58,7 +59,7 @@ class ReportService {
         'isResolved': true,
       });
     } catch (e) {
-      print('Error marking report as resolved: $e');
+      AppLogger.info('Error marking report as resolved: $e');
       rethrow;
     }
   }
@@ -73,7 +74,7 @@ class ReportService {
 
       return snapshot.docs.length;
     } catch (e) {
-      print('Error getting report count: $e');
+      AppLogger.info('Error getting report count: $e');
       return 0;
     }
   }

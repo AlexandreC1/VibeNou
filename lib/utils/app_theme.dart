@@ -8,6 +8,7 @@
 /// ============================================================================
 ///
 /// The app uses GENDER-BASED THEMING to create a personalized experience:
+library;
 /// - Female users see warm, romantic colors (pinks, purples, corals)
 /// - Male users see cool, modern colors (blues, teals, navy)
 ///

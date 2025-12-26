@@ -223,7 +223,7 @@ class MatchCelebrationDialog extends StatelessWidget {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: AppTheme.primaryGradient,
                     shape: BoxShape.circle,
                   ),
@@ -252,7 +252,7 @@ class MatchCelebrationDialog extends StatelessWidget {
               Text(
                 'You and $matchedUserName liked each other',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: AppTheme.textSecondary,
                   height: 1.5,

@@ -23,8 +23,8 @@ class LockoutMessageWidget extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: lockoutStatus.isLocked
-            ? Colors.red.withOpacity(0.1)
-            : Colors.orange.withOpacity(0.1),
+            ? Colors.red.withValues(alpha: 0.1)
+            : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: lockoutStatus.isLocked
@@ -100,7 +100,7 @@ class AccountLockedDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(

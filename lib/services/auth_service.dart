@@ -130,26 +130,26 @@ class AuthService {
     }
 
     try {
-      print('DEBUG: Attempting sign in for email: $email');
+      AppLogger.debug('Attempting sign in for email: $email');
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       User? user = result.user;
-      print('DEBUG: Firebase Auth successful. User ID: ${user?.uid}');
+      AppLogger.debug('Firebase Auth successful. User ID: ${user?.uid}');
 
       // Reset lockout on successful login
       await _lockoutService.resetLockout(email);
 
       if (user != null) {
         // Check if user document exists
-        print('DEBUG: Checking Firestore for user document...');
+        AppLogger.debug('Checking Firestore for user document...');
         DocumentSnapshot doc =
             await _firestore.collection('users').doc(user.uid).get();
 
         if (!doc.exists) {
-          print('DEBUG: User document not found. Creating new document with self-healing...');
+          AppLogger.debug('User document not found. Creating new document with self-healing...');
           // Self-healing: Create missing profile
           UserModel userModel = UserModel(
             uid: user.uid,
@@ -168,23 +168,23 @@ class AuthService {
                 .collection('users')
                 .doc(user.uid)
                 .set(userModel.toMap());
-            print('DEBUG: Successfully created user document in Firestore');
+            AppLogger.debug('Successfully created user document in Firestore');
           } catch (firestoreError) {
-            print('ERROR: Failed to create Firestore document: $firestoreError');
+            AppLogger.error('Failed to create Firestore document: $firestoreError');
             rethrow;
           }
 
           return userModel;
         }
 
-        print('DEBUG: User document found. Updating last active...');
+        AppLogger.debug('User document found. Updating last active...');
         // Update last active
         try {
           await _firestore.collection('users').doc(user.uid).update({
             'lastActive': FieldValue.serverTimestamp(),
           });
         } catch (updateError) {
-          print('WARNING: Failed to update last active: $updateError');
+          AppLogger.warning('Failed to update last active: $updateError');
           // Continue anyway - not critical
         }
 
@@ -204,12 +204,12 @@ class AuthService {
           // Continue anyway - not critical
         }
 
-        print('DEBUG: Returning user model from existing document');
+        AppLogger.debug('Returning user model from existing document');
         return UserModel.fromMap(doc.data() as Map<String, dynamic>, user.uid);
       }
     } catch (e) {
-      print('ERROR: Sign in failed: $e');
-      print('ERROR: Error type: ${e.runtimeType}');
+      AppLogger.error('Sign in failed: $e');
+      AppLogger.error('Error type: ${e.runtimeType}');
 
       // Record failed login attempt if it's a wrong password/email error
       if (e is FirebaseAuthException &&
@@ -294,7 +294,7 @@ class AuthService {
         }
       }
     } catch (e) {
-      print('Google sign in error: $e');
+      AppLogger.info('Google sign in error: $e');
       rethrow;
     }
     return null;
@@ -316,7 +316,7 @@ class AuthService {
             'lastActive': FieldValue.serverTimestamp(),
           });
         } catch (e) {
-          print('Error updating last active: $e');
+          AppLogger.info('Error updating last active: $e');
           // Continue with sign out even if this fails
         }
 
@@ -333,13 +333,13 @@ class AuthService {
       try {
         await _googleSignIn.signOut();
       } catch (e) {
-        print('Google sign out error (user may not be signed in with Google): $e');
+        AppLogger.info('Google sign out error (user may not be signed in with Google): $e');
         // Continue with Firebase sign out
       }
 
       await _auth.signOut();
     } catch (e) {
-      print('Sign out error: $e');
+      AppLogger.info('Sign out error: $e');
       rethrow;
     }
   }
@@ -353,7 +353,7 @@ class AuthService {
         return UserModel.fromMap(doc.data() as Map<String, dynamic>, uid);
       }
     } catch (e) {
-      print('Get user data error: $e');
+      AppLogger.info('Get user data error: $e');
     }
     return null;
   }
@@ -363,7 +363,7 @@ class AuthService {
     try {
       await _firestore.collection('users').doc(user.uid).update(user.toMap());
     } catch (e) {
-      print('Update profile error: $e');
+      AppLogger.info('Update profile error: $e');
       rethrow;
     }
   }
@@ -373,7 +373,7 @@ class AuthService {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
-      print('Reset password error: $e');
+      AppLogger.info('Reset password error: $e');
       rethrow;
     }
   }

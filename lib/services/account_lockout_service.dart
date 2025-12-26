@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/app_logger.dart';
 import 'audit_log_service.dart';
 
@@ -7,18 +6,17 @@ import 'audit_log_service.dart';
 /// Tracks failed login attempts and locks accounts after threshold
 class AccountLockoutService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuditLogService _auditLog = AuditLogService();
 
   // Configuration
-  static const int MAX_FAILED_ATTEMPTS = 5;
-  static const Duration LOCKOUT_DURATION = Duration(minutes: 15);
-  static const bool ENABLED = true; // Kill switch for rollback
+  static const int maxFailedAttempts = 5;
+  static const Duration lockoutDuration = Duration(minutes: 15);
+  static const bool enabled = true; // Kill switch for rollback
 
   /// Check if an email is currently locked out
   Future<LockoutStatus> checkLockout(String email) async {
-    if (!ENABLED) {
-      return LockoutStatus(isLocked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS);
+    if (!enabled) {
+      return LockoutStatus(isLocked: false, attemptsRemaining: maxFailedAttempts);
     }
 
     try {
@@ -30,7 +28,7 @@ class AccountLockoutService {
       if (!lockoutDoc.exists) {
         return LockoutStatus(
           isLocked: false,
-          attemptsRemaining: MAX_FAILED_ATTEMPTS,
+          attemptsRemaining: maxFailedAttempts,
         );
       }
 
@@ -52,19 +50,19 @@ class AccountLockoutService {
       return LockoutStatus(
         isLocked: false,
         failedAttempts: failedAttempts,
-        attemptsRemaining: MAX_FAILED_ATTEMPTS - failedAttempts,
+        attemptsRemaining: maxFailedAttempts - failedAttempts,
       );
     } catch (e) {
       AppLogger.error('Error checking lockout status', e);
       // Fail open - don't lock users out if service fails
-      return LockoutStatus(isLocked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS);
+      return LockoutStatus(isLocked: false, attemptsRemaining: maxFailedAttempts);
     }
   }
 
   /// Record a failed login attempt
   Future<LockoutStatus> recordFailedAttempt(String email) async {
-    if (!ENABLED) {
-      return LockoutStatus(isLocked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS);
+    if (!enabled) {
+      return LockoutStatus(isLocked: false, attemptsRemaining: maxFailedAttempts);
     }
 
     try {
@@ -96,8 +94,8 @@ class AccountLockoutService {
         }
 
         // Lock account if threshold reached
-        if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-          lockedUntil = DateTime.now().add(LOCKOUT_DURATION);
+        if (failedAttempts >= maxFailedAttempts) {
+          lockedUntil = DateTime.now().add(lockoutDuration);
 
           transaction.set(docRef, {
             'email': email,
@@ -114,7 +112,7 @@ class AccountLockoutService {
             lockedUntil: lockedUntil,
           );
 
-          AppLogger.warning('Account locked: $email (${failedAttempts} failed attempts)');
+          AppLogger.warning('Account locked: $email ($failedAttempts failed attempts)');
 
           return LockoutStatus(
             isLocked: true,
@@ -131,12 +129,12 @@ class AccountLockoutService {
           'lastAttempt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
-        AppLogger.warning('Failed login attempt for $email (${failedAttempts}/${MAX_FAILED_ATTEMPTS})');
+        AppLogger.warning('Failed login attempt for $email ($failedAttempts/$maxFailedAttempts)');
 
         return LockoutStatus(
           isLocked: false,
           failedAttempts: failedAttempts,
-          attemptsRemaining: MAX_FAILED_ATTEMPTS - failedAttempts,
+          attemptsRemaining: maxFailedAttempts - failedAttempts,
         );
       });
 
@@ -144,13 +142,13 @@ class AccountLockoutService {
     } catch (e) {
       AppLogger.error('Error recording failed login attempt', e);
       // Fail open
-      return LockoutStatus(isLocked: false, attemptsRemaining: MAX_FAILED_ATTEMPTS);
+      return LockoutStatus(isLocked: false, attemptsRemaining: maxFailedAttempts);
     }
   }
 
   /// Reset lockout after successful login
   Future<void> resetLockout(String email) async {
-    if (!ENABLED) return;
+    if (!enabled) return;
 
     try {
       await _firestore

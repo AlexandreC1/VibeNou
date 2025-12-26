@@ -1117,25 +1117,25 @@ class _EditProfileScreenState extends State<EditProfileScreen>
               },
               child: Column(
                 children: [
-                  RadioListTile<String?>(
-                    title: const Text('Everyone'),
-                    subtitle: const Text('Show all genders'),
+                  const RadioListTile<String?>(
+                    title: Text('Everyone'),
+                    subtitle: Text('Show all genders'),
                     value: null,
                     activeColor: AppTheme.primaryRose,
                     toggleable: true,
                   ),
                   const Divider(height: 1),
-                  RadioListTile<String?>(
-                    title: const Text('Men'),
-                    subtitle: const Text('Show only men'),
+                  const RadioListTile<String?>(
+                    title: Text('Men'),
+                    subtitle: Text('Show only men'),
                     value: 'male',
                     activeColor: AppTheme.primaryRose,
                     toggleable: true,
                   ),
                   const Divider(height: 1),
-                  RadioListTile<String?>(
-                    title: const Text('Women'),
-                    subtitle: const Text('Show only women'),
+                  const RadioListTile<String?>(
+                    title: Text('Women'),
+                    subtitle: Text('Show only women'),
                     value: 'female',
                     activeColor: AppTheme.primaryRose,
                     toggleable: true,

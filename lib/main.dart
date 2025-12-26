@@ -23,52 +23,54 @@ import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Initialize Firebase Crashlytics for error tracking
-  await ErrorTelemetryService.initialize();
-  AppLogger.info('Crashlytics initialized');
-
-  // Initialize Firebase App Check for bot protection
-  await CaptchaService.initialize();
-  AppLogger.info('App Check initialized');
-
-  // Set up background message handler for FCM
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // Initialize Push Notifications
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  AppLogger.info('Push notifications initialized');
-
-  // Initialize Supabase (only if configured)
-  try {
-    if (SupabaseConfig.supabaseUrl != 'YOUR_SUPABASE_URL' &&
-        SupabaseConfig.supabaseAnonKey != 'YOUR_SUPABASE_ANON_KEY') {
-      await Supabase.initialize(
-        url: SupabaseConfig.supabaseUrl,
-        anonKey: SupabaseConfig.supabaseAnonKey,
-      );
-      AppLogger.info('Supabase initialized successfully');
-    } else {
-      AppLogger.warning('Supabase not configured. Image uploads will use Firebase Storage instead.');
-    }
-  } catch (e) {
-    AppLogger.warning('Supabase initialization failed: $e');
-    AppLogger.info('Image uploads will use Firebase Storage instead.');
-  }
-
   // Run app with error zone to catch all errors
   runZonedGuarded(
-    () => runApp(const MyApp()),
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Load environment variables
+      await dotenv.load(fileName: ".env");
+
+      // Initialize Firebase
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // Initialize Firebase Crashlytics for error tracking
+      await ErrorTelemetryService.initialize();
+      AppLogger.info('Crashlytics initialized');
+
+      // Initialize Firebase App Check for bot protection
+      await CaptchaService.initialize();
+      AppLogger.info('App Check initialized');
+
+      // Set up background message handler for FCM
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+      // Initialize Push Notifications
+      final notificationService = NotificationService();
+      await notificationService.initialize();
+      AppLogger.info('Push notifications initialized');
+
+      // Initialize Supabase (only if configured)
+      try {
+        if (SupabaseConfig.supabaseUrl != 'YOUR_SUPABASE_URL' &&
+            SupabaseConfig.supabaseAnonKey != 'YOUR_SUPABASE_ANON_KEY') {
+          await Supabase.initialize(
+            url: SupabaseConfig.supabaseUrl,
+            anonKey: SupabaseConfig.supabaseAnonKey,
+          );
+          AppLogger.info('Supabase initialized successfully');
+        } else {
+          AppLogger.warning('Supabase not configured. Image uploads will use Firebase Storage instead.');
+        }
+      } catch (e) {
+        AppLogger.warning('Supabase initialization failed: $e');
+        AppLogger.info('Image uploads will use Firebase Storage instead.');
+      }
+
+      runApp(const MyApp());
+    },
     (error, stackTrace) {
       // Log fatal errors to Crashlytics
       ErrorTelemetryService.logError(
@@ -115,9 +117,12 @@ class MyApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''), // English
           Locale('fr', ''), // French
-          Locale('ht', ''), // Haitian Creole
         ],
         localeResolutionCallback: (locale, supportedLocales) {
+          // Map Haitian Creole to French for Material widgets (our app will use HT strings)
+          if (locale?.languageCode == 'ht') {
+            return const Locale('fr', '');
+          }
           // Check if the current locale is supported
           for (var supportedLocale in supportedLocales) {
             if (supportedLocale.languageCode == locale?.languageCode) {

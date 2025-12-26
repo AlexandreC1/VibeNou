@@ -5,7 +5,7 @@ import '../../widgets/qr_code_widget.dart';
 import '../../utils/app_logger.dart';
 
 class TwoFactorSetupScreen extends StatefulWidget {
-  const TwoFactorSetupScreen({Key? key}) : super(key: key);
+  const TwoFactorSetupScreen({super.key});
 
   @override
   State<TwoFactorSetupScreen> createState() => _TwoFactorSetupScreenState();
@@ -18,7 +18,7 @@ class _TwoFactorSetupScreenState extends State<TwoFactorSetupScreen> {
   String? _secret;
   String? _qrCodeUrl;
   List<String>? _recoveryCodes;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isVerifying = false;
   bool _setupComplete = false;
   int _currentStep = 0;

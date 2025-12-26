@@ -24,17 +24,18 @@ void main() {
 
     test('signIn creates user profile if missing (Self-healing)', () async {
       // Arrange
-      final email = 'test@example.com';
-      final password = 'password123';
-      
+      const email = 'test@example.com';
+      const password = 'password123';
+
       // Create user in Auth but NOT in Firestore
       final user = await mockAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       // Ensure Firestore is empty for this user
-      final userDoc = await mockFirestore.collection('users').doc(user.user!.uid).get();
+      final userDoc =
+          await mockFirestore.collection('users').doc(user.user!.uid).get();
       expect(userDoc.exists, false);
 
       // Act
@@ -46,9 +47,10 @@ void main() {
       // Assert
       expect(userModel, isNotNull);
       expect(userModel!.email, email);
-      
+
       // Verify profile was created in Firestore
-      final createdDoc = await mockFirestore.collection('users').doc(user.user!.uid).get();
+      final createdDoc =
+          await mockFirestore.collection('users').doc(user.user!.uid).get();
       expect(createdDoc.exists, true);
       expect(createdDoc.data()!['email'], email);
       expect(createdDoc.data()!['bio'], 'Welcome to VibeNou!');

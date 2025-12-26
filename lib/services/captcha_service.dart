@@ -9,12 +9,12 @@ class CaptchaService {
   static final FirebaseAppCheck _appCheck = FirebaseAppCheck.instance;
 
   // Configuration
-  static const bool ENABLED = true; // Kill switch for rollback
+  static const bool enabled = true; // Kill switch for rollback
 
   /// Initialize Firebase App Check
   /// Call this during app initialization
   static Future<void> initialize({String? debugToken}) async {
-    if (!ENABLED) {
+    if (!enabled) {
       AppLogger.info('CAPTCHA/App Check disabled');
       return;
     }
@@ -45,7 +45,7 @@ class CaptchaService {
   /// Verify reCAPTCHA token (alternative approach using Cloud Functions)
   /// This is useful for web or if you want to use Google reCAPTCHA v3
   static Future<CaptchaVerificationResult> verifyRecaptcha(String token) async {
-    if (!ENABLED) {
+    if (!enabled) {
       return CaptchaVerificationResult(
         success: true,
         score: 1.0,
@@ -85,7 +85,7 @@ class CaptchaService {
     required String action,
     double scoreThreshold = 0.5,
   }) async {
-    if (!ENABLED) {
+    if (!enabled) {
       return true;
     }
 

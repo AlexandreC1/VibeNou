@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -10,6 +9,7 @@ import '../../services/user_service.dart';
 import '../../services/location_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/online_presence_service.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/user_card.dart';
@@ -114,10 +114,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Future<void> _loadCurrentUser() async {
     final authService = Provider.of<AuthService>(context, listen: false);
-    print('DEBUG: Loading current user. Auth user: ${authService.currentUser?.uid}');
+    AppLogger.debug('Loading current user. Auth user: ${authService.currentUser?.uid}');
     if (authService.currentUser != null) {
       final user = await authService.getUserData(authService.currentUser!.uid);
-      print('DEBUG: Current user loaded: ${user?.name}, Location: ${user?.location}');
+      AppLogger.debug('Current user loaded: ${user?.name}, Location: ${user?.location}');
 
       // Update online presence
       await _presenceService.updatePresence(authService.currentUser!.uid);
@@ -138,19 +138,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         _loadSimilarUsers();
       }
     } else {
-      print('DEBUG: No authenticated user found');
+      AppLogger.debug('No authenticated user found');
     }
   }
 
   Future<void> _loadNearbyUsers() async {
-    print('DEBUG: _loadNearbyUsers called. Current user: ${_currentUser?.name}, Location: ${_currentUser?.location}');
+    AppLogger.debug('_loadNearbyUsers called. Current user: ${_currentUser?.name}, Location: ${_currentUser?.location}');
 
     if (_currentUser == null || _currentUser!.location == null) {
-      print('DEBUG: Requesting location permission...');
+      AppLogger.debug('Requesting location permission...');
       // Request location permission
       final position = await _locationService.getCurrentPosition();
       if (position == null) {
-        print('DEBUG: Location permission denied');
+        AppLogger.debug('Location permission denied');
         if (mounted) {
           final messenger = ScaffoldMessenger.of(context);
           messenger.showSnackBar(
@@ -163,7 +163,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         return;
       }
 
-      print('DEBUG: Location obtained: ${position.latitude}, ${position.longitude}');
+      AppLogger.debug('Location obtained: ${position.latitude}, ${position.longitude}');
 
       // Update user location
       if (!mounted) return;
@@ -180,12 +180,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             );
           });
         }
-        print('DEBUG: User location updated in Firestore');
+        AppLogger.debug('User location updated in Firestore');
       }
     }
 
     if (_currentUser?.location == null) {
-      print('DEBUG: Still no location after update, returning');
+      AppLogger.debug('Still no location after update, returning');
       return;
     }
 
@@ -194,14 +194,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     try {
       // Use user's preferred max distance, default to 10000km (global) if not set
       final radiusInKm = _currentUser!.preferredMaxDistance?.toDouble() ?? 10000.0;
-      print('DEBUG: Fetching nearby users within ${radiusInKm}km...');
+      AppLogger.debug('Fetching nearby users within ${radiusInKm}km...');
       final users = await _userService.getNearbyUsers(
         currentUserId: _currentUser!.uid,
         userLocation: _currentUser!.location!,
         radiusInKm: radiusInKm,
       );
 
-      print('DEBUG: Found ${users.length} nearby users');
+      AppLogger.debug('Found ${users.length} nearby users');
       setState(() {
         _nearbyUsers = users;
         _filteredNearbyUsers = users;
@@ -209,7 +209,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       });
       _applyFilters();
     } catch (e) {
-      print('DEBUG: Error loading nearby users: $e');
+      AppLogger.error('Error loading nearby users', e);
       setState(() => _isLoadingNearby = false);
     }
   }
@@ -641,7 +641,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: AppTheme.primaryGradient,
                 shape: BoxShape.circle,
               ),
@@ -729,7 +729,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppTheme.purpleGradient,
                   shape: BoxShape.circle,
                 ),
@@ -835,7 +835,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: AppTheme.purpleGradient,
                 shape: BoxShape.circle,
               ),
@@ -923,7 +923,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppTheme.purpleGradient,
                   shape: BoxShape.circle,
                 ),

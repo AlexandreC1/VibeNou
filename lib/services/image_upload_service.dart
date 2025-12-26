@@ -21,7 +21,7 @@ class ImageUploadService {
       }
       return null;
     } catch (e) {
-      print('Error picking image: $e');
+      AppLogger.info('Error picking image: $e');
       rethrow;
     }
   }
@@ -41,7 +41,7 @@ class ImageUploadService {
       }
       return null;
     } catch (e) {
-      print('Error taking photo: $e');
+      AppLogger.info('Error taking photo: $e');
       rethrow;
     }
   }
@@ -69,7 +69,7 @@ class ImageUploadService {
 
       return downloadUrl;
     } catch (e) {
-      print('Error uploading profile picture: $e');
+      AppLogger.info('Error uploading profile picture: $e');
       rethrow;
     }
   }
@@ -80,7 +80,7 @@ class ImageUploadService {
       final Reference ref = _storage.refFromURL(photoUrl);
       await ref.delete();
     } catch (e) {
-      print('Error deleting profile picture: $e');
+      AppLogger.info('Error deleting profile picture: $e');
       rethrow;
     }
   }

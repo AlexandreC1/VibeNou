@@ -213,7 +213,7 @@ class CompactProfileCompletion extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
+            const Icon(
               Icons.arrow_forward_ios,
               color: AppTheme.primaryRose,
               size: 12,

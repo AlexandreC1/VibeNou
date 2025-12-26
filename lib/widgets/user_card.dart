@@ -148,7 +148,7 @@ class _UserCardState extends State<UserCard> {
                             if (widget.subtitle != null)
                               Row(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.location_on,
                                     size: 16,
                                     color: AppTheme.coral,

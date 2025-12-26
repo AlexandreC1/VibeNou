@@ -99,7 +99,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 future: _getUserData(userId),
                 builder: (context, userSnapshot) {
                   if (!userSnapshot.hasData) {
-                    return Card(
+                    return const Card(
                       child: Center(
                         child: CircularProgressIndicator(
                           color: AppTheme.coral,

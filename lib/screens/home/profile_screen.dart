@@ -8,6 +8,7 @@
 /// - Settings (language, location)
 ///
 /// FEATURES:
+library;
 /// - Gender-based theming (Blue for male, Pink for female)
 /// - Floating action button for easy profile editing
 /// - Prominent photo management card for easy photo uploads
@@ -33,6 +34,7 @@ import '../../services/auth_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/app_logger.dart';
 import '../../providers/language_provider.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../profile/edit_profile_screen.dart';
@@ -174,7 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _changeLanguage(String languageCode) async {
     if (!mounted) return;
 
-    print('ProfileScreen: Changing language to: $languageCode');
+    AppLogger.info('ProfileScreen: Changing language to: $languageCode');
 
     if (!mounted) return;
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
@@ -189,9 +191,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .collection('users')
             .doc(authService.currentUser!.uid)
             .update({'preferredLanguage': languageCode});
-        print('ProfileScreen: Updated Firestore preferredLanguage to: $languageCode');
+        AppLogger.info('ProfileScreen: Updated Firestore preferredLanguage to: $languageCode');
       } catch (e) {
-        print('Error updating language preference: $e');
+        AppLogger.info('Error updating language preference: $e');
       }
     }
 
@@ -850,43 +852,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'en',
-              groupValue: _currentUser!.preferredLanguage,
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            String selectedLanguage = _currentUser!.preferredLanguage;
+            return RadioGroup<String>(
+              groupValue: selectedLanguage,
               onChanged: (value) {
                 if (value != null) {
+                  setState(() => selectedLanguage = value);
                   _changeLanguage(value);
                   Navigator.pop(context);
                 }
               },
-            ),
-            RadioListTile<String>(
-              title: const Text('Français'),
-              value: 'fr',
-              groupValue: _currentUser!.preferredLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Kreyòl Ayisyen'),
-              value: 'ht',
-              groupValue: _currentUser!.preferredLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-          ],
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    title: Text('English'),
+                    value: 'en',
+                  ),
+                  RadioListTile<String>(
+                    title: Text('Français'),
+                    value: 'fr',
+                  ),
+                  RadioListTile<String>(
+                    title: Text('Kreyòl Ayisyen'),
+                    value: 'ht',
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

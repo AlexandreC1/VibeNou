@@ -8,6 +8,7 @@
 /// ============================================================================
 ///
 /// The model is organized into logical sections:
+library;
 /// 1. BASIC PROFILE: Essential user information
 /// 2. LOCATION DATA: GPS and geocoded location
 /// 3. DATING PREFERENCES: User's search criteria

@@ -199,7 +199,7 @@ class _CompactOnlineCounterState extends State<CompactOnlineCounter> {
           _onlineCount >= 1000
               ? '${(_onlineCount / 1000).toStringAsFixed(1)}K'
               : '$_onlineCount',
-          style: TextStyle(
+          style: const TextStyle(
             color: AppTheme.textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w500,

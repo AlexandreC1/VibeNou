@@ -5,6 +5,7 @@ import '../utils/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/fix_user_profile.dart';
+import '../utils/app_logger.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,7 +57,7 @@ class _SplashScreenState extends State<SplashScreen>
       try {
         await fixCurrentUserProfile();
       } catch (e) {
-        print('Note: Profile fix attempted: $e');
+        AppLogger.info('Note: Profile fix attempted: $e');
       }
 
       // Load user data and set theme + language
@@ -66,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
 
         // Set user's preferred language
         if (userData.preferredLanguage.isNotEmpty) {
-          print('SplashScreen: Setting language from user data: ${userData.preferredLanguage}');
+          AppLogger.info('SplashScreen: Setting language from user data: ${userData.preferredLanguage}');
           await languageProvider.setLocale(userData.preferredLanguage);
         }
       }

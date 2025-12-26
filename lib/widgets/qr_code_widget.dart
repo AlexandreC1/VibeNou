@@ -9,12 +9,12 @@ class QRCodeWidget extends StatelessWidget {
   final Color? backgroundColor;
 
   const QRCodeWidget({
-    Key? key,
+    super.key,
     required this.data,
     this.size = 200,
     this.foregroundColor,
     this.backgroundColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,14 @@ class QRCodeWidget extends StatelessWidget {
         data: data,
         version: QrVersions.auto,
         size: size,
-        foregroundColor: foregroundColor ?? Colors.black,
+        eyeStyle: QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: foregroundColor ?? Colors.black,
+        ),
+        dataModuleStyle: QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: foregroundColor ?? Colors.black,
+        ),
         backgroundColor: backgroundColor ?? Colors.white,
         errorCorrectionLevel: QrErrorCorrectLevel.M,
       ),

@@ -219,44 +219,34 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
         border: Border.all(color: AppTheme.borderColor),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          RadioListTile<String?>(
-            title: const Text('Everyone'),
-            value: null,
-            groupValue: _preferredGender,
-            activeColor: AppTheme.primaryRose,
-            onChanged: (value) {
-              setState(() {
-                _preferredGender = value;
-              });
-            },
-          ),
-          const Divider(height: 1),
-          RadioListTile<String?>(
-            title: const Text('Men'),
-            value: 'male',
-            groupValue: _preferredGender,
-            activeColor: AppTheme.primaryRose,
-            onChanged: (value) {
-              setState(() {
-                _preferredGender = value;
-              });
-            },
-          ),
-          const Divider(height: 1),
-          RadioListTile<String?>(
-            title: const Text('Women'),
-            value: 'female',
-            groupValue: _preferredGender,
-            activeColor: AppTheme.primaryRose,
-            onChanged: (value) {
-              setState(() {
-                _preferredGender = value;
-              });
-            },
-          ),
-        ],
+      child: RadioGroup<String?>(
+        groupValue: _preferredGender,
+        onChanged: (value) {
+          setState(() {
+            _preferredGender = value;
+          });
+        },
+        child: const Column(
+          children: [
+            RadioListTile<String?>(
+              title: Text('Everyone'),
+              value: null,
+              activeColor: AppTheme.primaryRose,
+            ),
+            Divider(height: 1),
+            RadioListTile<String?>(
+              title: Text('Men'),
+              value: 'male',
+              activeColor: AppTheme.primaryRose,
+            ),
+            Divider(height: 1),
+            RadioListTile<String?>(
+              title: Text('Women'),
+              value: 'female',
+              activeColor: AppTheme.primaryRose,
+            ),
+          ],
+        ),
       ),
     );
   }

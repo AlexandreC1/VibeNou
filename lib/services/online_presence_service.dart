@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/app_logger.dart';
 
 /// Online Presence Service
 ///
@@ -11,7 +12,7 @@ class OnlinePresenceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// How long before a user is considered offline (in minutes)
-  static const int ONLINE_THRESHOLD_MINUTES = 5;
+  static const int onlineThresholdMinutes = 5;
 
   /// Update user's last active timestamp
   /// Call this when:
@@ -26,7 +27,7 @@ class OnlinePresenceService {
       });
     } catch (e) {
       // Silently fail - presence is not critical
-      print('Failed to update presence: $e');
+      AppLogger.info('Failed to update presence: $e');
     }
   }
 
@@ -38,7 +39,7 @@ class OnlinePresenceService {
         'lastActive': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Failed to set offline: $e');
+      AppLogger.info('Failed to set offline: $e');
     }
   }
 
@@ -47,7 +48,7 @@ class OnlinePresenceService {
   Future<int> getOnlineCount() async {
     try {
       final threshold = DateTime.now().subtract(
-        const Duration(minutes: ONLINE_THRESHOLD_MINUTES),
+        const Duration(minutes: 5),
       );
 
       final snapshot = await _firestore
@@ -58,7 +59,7 @@ class OnlinePresenceService {
 
       return snapshot.count ?? 0;
     } catch (e) {
-      print('Failed to get online count: $e');
+      AppLogger.info('Failed to get online count: $e');
       return 0;
     }
   }
@@ -67,7 +68,7 @@ class OnlinePresenceService {
   /// Updates in real-time as users come online/offline
   Stream<int> onlineCountStream() {
     final threshold = DateTime.now().subtract(
-      const Duration(minutes: ONLINE_THRESHOLD_MINUTES),
+      const Duration(minutes: onlineThresholdMinutes),
     );
 
     return _firestore
@@ -89,12 +90,12 @@ class OnlinePresenceService {
       if (lastActive == null) return false;
 
       final threshold = DateTime.now().subtract(
-        const Duration(minutes: ONLINE_THRESHOLD_MINUTES),
+        const Duration(minutes: 5),
       );
 
       return lastActive.isAfter(threshold);
     } catch (e) {
-      print('Failed to check user online status: $e');
+      AppLogger.info('Failed to check user online status: $e');
       return false;
     }
   }
@@ -103,7 +104,7 @@ class OnlinePresenceService {
   Future<List<String>> getOnlineUserIds({int limit = 100}) async {
     try {
       final threshold = DateTime.now().subtract(
-        const Duration(minutes: ONLINE_THRESHOLD_MINUTES),
+        const Duration(minutes: 5),
       );
 
       final snapshot = await _firestore
@@ -114,7 +115,7 @@ class OnlinePresenceService {
 
       return snapshot.docs.map((doc) => doc.id).toList();
     } catch (e) {
-      print('Failed to get online users: $e');
+      AppLogger.info('Failed to get online users: $e');
       return [];
     }
   }

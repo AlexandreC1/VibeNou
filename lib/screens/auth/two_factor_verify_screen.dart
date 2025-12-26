@@ -8,10 +8,10 @@ class TwoFactorVerifyScreen extends StatefulWidget {
   final VoidCallback onSuccess;
 
   const TwoFactorVerifyScreen({
-    Key? key,
+    super.key,
     required this.userId,
     required this.onSuccess,
-  }) : super(key: key);
+  });
 
   @override
   State<TwoFactorVerifyScreen> createState() => _TwoFactorVerifyScreenState();
@@ -222,10 +222,10 @@ class _TwoFactorVerifyScreenState extends State<TwoFactorVerifyScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.blue.withOpacity(0.3),
+                    color: Colors.blue.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(

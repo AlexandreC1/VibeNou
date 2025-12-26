@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
+import 'app_logger.dart';
 
 /// Emergency function to create missing Firestore profile for authenticated users
 /// This fixes the "profile data not found" issue
@@ -20,7 +21,7 @@ Future<void> fixMissingUserProfile({
     final docSnapshot = await firestore.collection('users').doc(uid).get();
 
     if (docSnapshot.exists) {
-      print('✅ Profile already exists for $uid');
+      AppLogger.info('✅ Profile already exists for $uid');
       return;
     }
 
@@ -40,12 +41,12 @@ Future<void> fixMissingUserProfile({
 
     await firestore.collection('users').doc(uid).set(userModel.toMap());
 
-    print('✅ Successfully created profile for $uid');
-    print('   Name: $name');
-    print('   Gender: ${gender ?? "not specified"}');
-    print('   Age: $age');
+    AppLogger.info('✅ Successfully created profile for $uid');
+    AppLogger.info('   Name: $name');
+    AppLogger.info('   Gender: ${gender ?? "not specified"}');
+    AppLogger.info('   Age: $age');
   } catch (e) {
-    print('❌ Error fixing user profile: $e');
+    AppLogger.error('Error fixing user profile: $e');
     rethrow;
   }
 }
@@ -59,7 +60,7 @@ Future<void> fixCurrentUserProfile() async {
   final currentUser = FirebaseAuth.instance.currentUser;
 
   if (currentUser == null) {
-    print('❌ No user is currently logged in');
+    AppLogger.error('No user is currently logged in');
     return;
   }
 

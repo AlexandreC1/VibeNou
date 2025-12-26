@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../utils/app_logger.dart';
 
@@ -6,7 +5,6 @@ import '../utils/app_logger.dart';
 /// Works in conjunction with server-side Firestore rate limiting
 class RateLimitService {
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Cache for rate limit status to reduce Cloud Function calls
   final Map<String, _RateLimitCache> _cache = {};

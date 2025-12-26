@@ -67,7 +67,7 @@
 
 4. **Click the "Rules" tab**
    - It's next to "Data", "Indexes", "Usage"
-   - Should see existing rules code on the right
+   - Should see existing rules code on the rightg rules code on the right
 
 5. You should now see:
    - A code editor on the right
@@ -231,9 +231,9 @@
 
 Mark these off as you complete them:
 
-- [ ] Opened `firestore.rules.NEW` file
-- [ ] Copied all rules (Ctrl+A, Ctrl+C)
-- [ ] Logged into Firebase Console
+- [ok ] Opened `firestore.rules.NEW` file
+- [ok] Copied all rules (Ctrl+A, Ctrl+C)
+- [ok ] Logged into Firebase Console
 - [ ] Navigated to Firestore → Rules
 - [ ] Deleted old rules
 - [ ] Pasted new rules

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/profile_view_model.dart';
+import '../utils/app_logger.dart';
 
 class ProfileViewService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -57,7 +58,7 @@ class ProfileViewService {
         'profileViewCount': FieldValue.increment(1),
       });
     } catch (e) {
-      print('Error recording profile view: $e');
+      AppLogger.info('Error recording profile view: $e');
     }
   }
 
@@ -92,7 +93,7 @@ class ProfileViewService {
 
       return snapshot.docs.length;
     } catch (e) {
-      print('Error getting unread view count: $e');
+      AppLogger.info('Error getting unread view count: $e');
       return 0;
     }
   }
@@ -114,7 +115,7 @@ class ProfileViewService {
 
       await batch.commit();
     } catch (e) {
-      print('Error marking views as read: $e');
+      AppLogger.info('Error marking views as read: $e');
     }
   }
 
@@ -135,7 +136,7 @@ class ProfileViewService {
 
       await batch.commit();
     } catch (e) {
-      print('Error cleaning up old views: $e');
+      AppLogger.info('Error cleaning up old views: $e');
     }
   }
 }

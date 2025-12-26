@@ -2,13 +2,14 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/app_logger.dart';
 
 class SupabaseImageService {
   SupabaseClient? get _supabase {
     try {
       return Supabase.instance.client;
     } catch (e) {
-      print('⚠️ Supabase not initialized');
+      AppLogger.info('⚠️ Supabase not initialized');
       return null;
     }
   }
@@ -27,7 +28,7 @@ class SupabaseImageService {
 
       return image;
     } catch (e) {
-      print('Error picking image: $e');
+      AppLogger.info('Error picking image: $e');
       rethrow;
     }
   }
@@ -44,7 +45,7 @@ class SupabaseImageService {
 
       return image;
     } catch (e) {
-      print('Error taking photo: $e');
+      AppLogger.info('Error taking photo: $e');
       rethrow;
     }
   }
@@ -96,7 +97,7 @@ class SupabaseImageService {
         }
       }
 
-      print('✅ Image validation passed: ${(fileBytes.length / 1024).toStringAsFixed(0)} KB');
+      AppLogger.info('✅ Image validation passed: ${(fileBytes.length / 1024).toStringAsFixed(0)} KB');
       // ===== END VALIDATION =====
 
       // Upload file to Supabase Storage
@@ -118,7 +119,7 @@ class SupabaseImageService {
 
       return publicUrl;
     } catch (e) {
-      print('Error uploading profile picture: $e');
+      AppLogger.info('Error uploading profile picture: $e');
       rethrow;
     }
   }
@@ -138,7 +139,7 @@ class SupabaseImageService {
           .from('vibenou-profiles')
           .remove([filePath]);
     } catch (e) {
-      print('Error deleting profile picture: $e');
+      AppLogger.info('Error deleting profile picture: $e');
       rethrow;
     }
   }
@@ -147,7 +148,7 @@ class SupabaseImageService {
   String? getProfilePictureUrl(String userId) {
     final supabaseClient = _supabase;
     if (supabaseClient == null) {
-      print('⚠️ Supabase is not initialized');
+      AppLogger.info('⚠️ Supabase is not initialized');
       return null;
     }
 
@@ -215,7 +216,7 @@ class SupabaseImageService {
         }
       }
 
-      print('✅ Chat image validation passed: ${(fileBytes.length / 1024).toStringAsFixed(0)} KB');
+      AppLogger.info('✅ Chat image validation passed: ${(fileBytes.length / 1024).toStringAsFixed(0)} KB');
       // ===== END VALIDATION =====
 
       // Upload file to Supabase Storage
@@ -235,10 +236,10 @@ class SupabaseImageService {
           .from('vibenou-profiles')
           .getPublicUrl(filePath);
 
-      print('✅ Chat image uploaded successfully: $publicUrl');
+      AppLogger.info('✅ Chat image uploaded successfully: $publicUrl');
       return publicUrl;
     } catch (e) {
-      print('❌ Error uploading chat image: $e');
+      AppLogger.error('Error uploading chat image: $e');
       rethrow;
     }
   }
@@ -269,9 +270,9 @@ class SupabaseImageService {
           .from('vibenou-profiles')
           .remove([filePath]);
 
-      print('✅ Chat image deleted: $filePath');
+      AppLogger.info('✅ Chat image deleted: $filePath');
     } catch (e) {
-      print('❌ Error deleting chat image: $e');
+      AppLogger.error('Error deleting chat image: $e');
       rethrow;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_logger.dart';
 
 class AppLocalizations {
   final Locale locale;
@@ -140,10 +141,10 @@ class AppLocalizations {
 
   String translate(String key) {
     // Debug: Print current locale for troubleshooting
-    // print('AppLocalizations: locale=${locale.languageCode}, key=$key');
+    // AppLogger.debug('AppLocalizations: locale=${locale.languageCode}, key=$key');
     final value = _localizedValues[locale.languageCode]?[key];
     if (value == null) {
-      print('WARNING: Missing translation for key "$key" in locale "${locale.languageCode}"');
+      AppLogger.warning('Missing translation for key "$key" in locale "${locale.languageCode}"');
     }
     return value ?? key;
   }

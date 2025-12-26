@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../utils/app_logger.dart';
 
 class LocationService {
   // Check if location services are enabled
@@ -41,7 +42,7 @@ class LocationService {
         desiredAccuracy: LocationAccuracy.high,
       );
     } catch (e) {
-      print('Error getting current position: $e');
+      AppLogger.info('Error getting current position: $e');
       return null;
     }
   }
@@ -66,7 +67,7 @@ class LocationService {
         };
       }
     } catch (e) {
-      print('Error getting address: $e');
+      AppLogger.info('Error getting address: $e');
     }
     return null;
   }

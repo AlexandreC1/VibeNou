@@ -7,7 +7,7 @@
 /// - Real-time message streams with pagination
 /// - Typing indicators
 /// - Push notification integration
-///
+library;
 /// ENCRYPTION:
 /// The service implements hybrid encryption:
 /// - RSA-2048 for secure key exchange

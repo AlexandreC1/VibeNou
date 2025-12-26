@@ -46,11 +46,12 @@ class _SuccessStoriesScreenState extends State<SuccessStoriesScreen> {
           }
 
           final stories = snapshot.data?.docs.map((doc) {
-            return SuccessStory.fromMap(
-              doc.data() as Map<String, dynamic>,
-              doc.id,
-            );
-          }).toList() ?? [];
+                return SuccessStory.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                );
+              }).toList() ??
+              [];
 
           if (stories.isEmpty) {
             return Center(
@@ -129,7 +130,7 @@ class _SuccessStoriesScreenState extends State<SuccessStoriesScreen> {
               children: [
                 _buildCoupleAvatar(story.user1Photo, story.user1Name),
                 const SizedBox(width: 16),
-                Icon(Icons.favorite, color: AppTheme.coral, size: 32),
+                const Icon(Icons.favorite, color: AppTheme.coral, size: 32),
                 const SizedBox(width: 16),
                 _buildCoupleAvatar(story.user2Photo, story.user2Name),
               ],
@@ -176,7 +177,8 @@ class _SuccessStoriesScreenState extends State<SuccessStoriesScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.favorite_border, size: 18, color: Colors.grey[600]),
+                    Icon(Icons.favorite_border,
+                        size: 18, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
                       '${story.likes}',

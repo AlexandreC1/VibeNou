@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math';
 import '../models/user_model.dart';
+import '../utils/app_logger.dart';
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -24,16 +25,16 @@ class UserService {
     double radiusInKm = 50,
   }) async {
     try {
-      print('DEBUG UserService: Querying users (excluding $currentUserId)');
-      print('DEBUG UserService: User location: ${userLocation.latitude}, ${userLocation.longitude}');
-      print('DEBUG UserService: Search radius: ${radiusInKm}km');
+      AppLogger.info('DEBUG UserService: Querying users (excluding $currentUserId)');
+      AppLogger.info('DEBUG UserService: User location: ${userLocation.latitude}, ${userLocation.longitude}');
+      AppLogger.info('DEBUG UserService: Search radius: ${radiusInKm}km');
 
       QuerySnapshot snapshot = await _firestore
           .collection('users')
           .where('uid', isNotEqualTo: currentUserId)
           .get();
 
-      print('DEBUG UserService: Found ${snapshot.docs.length} total users in database');
+      AppLogger.info('DEBUG UserService: Found ${snapshot.docs.length} total users in database');
 
       List<UserModel> allUsers = snapshot.docs
           .map((doc) => UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
@@ -51,22 +52,22 @@ class UserService {
             user.location!.latitude,
             user.location!.longitude,
           );
-          print('DEBUG UserService: User ${user.name} is ${distance.toStringAsFixed(2)}km away');
+          AppLogger.info('DEBUG UserService: User ${user.name} is ${distance.toStringAsFixed(2)}km away');
           if (distance <= radiusInKm) {
             nearbyUsers.add(user);
-            print('DEBUG UserService: -> Added ${user.name} to nearby users');
+            AppLogger.info('DEBUG UserService: -> Added ${user.name} to nearby users');
           }
         } else {
           usersWithoutLocation++;
         }
       }
 
-      print('DEBUG UserService: $usersWithoutLocation users without location data');
-      print('DEBUG UserService: Returning ${nearbyUsers.length} nearby users');
+      AppLogger.info('DEBUG UserService: $usersWithoutLocation users without location data');
+      AppLogger.info('DEBUG UserService: Returning ${nearbyUsers.length} nearby users');
 
       return nearbyUsers;
     } catch (e) {
-      print('ERROR UserService: Error getting nearby users: $e');
+      AppLogger.info('ERROR UserService: Error getting nearby users: $e');
       return [];
     }
   }
@@ -138,7 +139,7 @@ class UserService {
 
       return usersWithSimilarity;
     } catch (e) {
-      print('Error getting users by similarity: $e');
+      AppLogger.info('Error getting users by similarity: $e');
       return [];
     }
   }
@@ -150,7 +151,7 @@ class UserService {
       final docSnapshot = await _firestore.collection('users').doc(uid).get();
 
       if (!docSnapshot.exists) {
-        print('User document not found for uid: $uid. Skipping location update.');
+        AppLogger.info('User document not found for uid: $uid. Skipping location update.');
         return;
       }
 
@@ -161,7 +162,7 @@ class UserService {
         'lastActive': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error updating location: $e');
+      AppLogger.info('Error updating location: $e');
       // Don't rethrow - just log the error
     }
   }
