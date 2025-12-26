@@ -325,7 +325,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             // Search and Filter Bar
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
@@ -392,7 +392,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             // Online Counter - Social Proof Element
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: const Align(
                 alignment: Alignment.centerLeft,
                 child: OnlineCounterWidget(),
@@ -782,7 +782,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         await _loadNearbyUsers();
       },
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: _filteredNearbyUsers.length,
         itemBuilder: (context, index) {
           final user = _filteredNearbyUsers[index];
@@ -975,7 +975,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         await _loadSimilarUsers();
       },
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: _filteredSimilarUsers.length,
         itemBuilder: (context, index) {
           final userWithSimilarity = _filteredSimilarUsers[index];

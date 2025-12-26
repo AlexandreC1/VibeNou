@@ -6,6 +6,7 @@ import '../providers/theme_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/fix_user_profile.dart';
 import '../utils/app_logger.dart';
+import '../widgets/haitian_heart_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -102,31 +103,10 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // App Logo/Icon
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'VN',
-                        style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryRose,
-                        ),
-                      ),
-                    ),
+                  // 🇭🇹 Haitian Heart Logo
+                  const HaitianHeartLogo(
+                    size: 140,
+                    animate: true,
                   ),
                   const SizedBox(height: 30),
                   const Text(

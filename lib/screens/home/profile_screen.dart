@@ -417,7 +417,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.grey[500],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: _logout,
                     icon: const Icon(Icons.logout),
@@ -567,7 +567,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Bio Section
             Padding(
@@ -588,7 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Interests Section
             Padding(
@@ -619,7 +619,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
 
             // Photo Gallery Management Card
             Padding(
@@ -778,12 +778,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Settings
             _buildSettingsSection(localizations),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Logout Button
             Padding(
@@ -803,7 +803,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 16),
           ],
         ),
       ),
