@@ -117,12 +117,9 @@ class MyApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''), // English
           Locale('fr', ''), // French
+          Locale('ht', ''), // Haitian Creole (Kreyòl Ayisyen)
         ],
         localeResolutionCallback: (locale, supportedLocales) {
-          // Map Haitian Creole to French for Material widgets (our app will use HT strings)
-          if (locale?.languageCode == 'ht') {
-            return const Locale('fr', '');
-          }
           // Check if the current locale is supported
           for (var supportedLocale in supportedLocales) {
             if (supportedLocale.languageCode == locale?.languageCode) {
