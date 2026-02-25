@@ -14,6 +14,10 @@ class TwoFactorService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  DocumentReference<Map<String, dynamic>> _securityDocRef(String userId) {
+    return _firestore.collection('users').doc(userId).collection('private').doc('security');
+  }
+
   /// Generate a random secret key for TOTP
   /// Returns base32-encoded secret (compatible with authenticator apps)
   String generateSecret() {
@@ -126,10 +130,16 @@ class TwoFactorService {
       // Store 2FA configuration
       await _firestore.collection('users').doc(user.uid).update({
         'twoFactorEnabled': true,
-        'twoFactorSecret': secret, // In production, encrypt this!
+        // Clean up legacy insecure fields from root profile document.
+        'twoFactorSecret': FieldValue.delete(),
+        'recoveryCodes': FieldValue.delete(),
+      });
+      await _securityDocRef(user.uid).set({
+        'twoFactorSecret': secret,
         'recoveryCodes': hashedCodes,
         'twoFactorSetupAt': FieldValue.serverTimestamp(),
-      });
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       AppLogger.info('2FA enabled for user ${user.uid}');
 
@@ -153,13 +163,16 @@ class TwoFactorService {
       }
 
       // Get user's 2FA secret
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (!doc.exists) {
-        throw Exception('User document not found');
-      }
+      final securityDoc = await _securityDocRef(user.uid).get();
+      final securityData = securityDoc.data() ?? {};
+      String? secret = securityData['twoFactorSecret'] as String?;
 
-      final data = doc.data()!;
-      final secret = data['twoFactorSecret'] as String?;
+      // Backward compatibility: read from legacy user doc if needed.
+      if (secret == null) {
+        final legacyUserDoc = await _firestore.collection('users').doc(user.uid).get();
+        final legacyData = legacyUserDoc.data() ?? {};
+        secret = legacyData['twoFactorSecret'] as String?;
+      }
 
       if (secret == null) {
         throw Exception('2FA not enabled');
@@ -171,12 +184,13 @@ class TwoFactorService {
       }
 
       // Remove 2FA configuration
-      await _firestore.collection('users').doc(user.uid).update({
-        'twoFactorEnabled': false,
+      await _firestore.collection('users').doc(user.uid).update({'twoFactorEnabled': false});
+      await _securityDocRef(user.uid).set({
         'twoFactorSecret': FieldValue.delete(),
         'recoveryCodes': FieldValue.delete(),
         'twoFactorDisabledAt': FieldValue.serverTimestamp(),
-      });
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       AppLogger.info('2FA disabled for user ${user.uid}');
     } catch (e) {
@@ -191,11 +205,11 @@ class TwoFactorService {
       final user = _auth.currentUser;
       if (user == null) return false;
 
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (!doc.exists) return false;
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) return false;
 
-      final data = doc.data()!;
-      return data['twoFactorEnabled'] == true;
+      final userData = userDoc.data()!;
+      return userData['twoFactorEnabled'] == true;
     } catch (e) {
       AppLogger.error('Failed to check 2FA status', e);
       return false;
@@ -208,20 +222,23 @@ class TwoFactorService {
       final user = _auth.currentUser;
       if (user == null) return null;
 
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (!doc.exists) return null;
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) return null;
 
-      final data = doc.data()!;
+      final data = userDoc.data()!;
 
       if (data['twoFactorEnabled'] != true) {
         return null;
       }
 
+      final securityDoc = await _securityDocRef(user.uid).get();
+      final securityData = securityDoc.data() ?? {};
+
       return {
         'enabled': true,
-        'secret': data['twoFactorSecret'],
-        'setupAt': data['twoFactorSetupAt'],
-        'hasRecoveryCodes': data['recoveryCodes'] != null,
+        'secret': securityData['twoFactorSecret'],
+        'setupAt': securityData['twoFactorSetupAt'],
+        'hasRecoveryCodes': securityData['recoveryCodes'] != null,
       };
     } catch (e) {
       AppLogger.error('Failed to get 2FA config', e);
@@ -233,14 +250,21 @@ class TwoFactorService {
   /// Supports both TOTP codes and recovery codes
   Future<bool> verifyTwoFactorLogin(String userId, String code) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (!doc.exists) {
-        throw Exception('User not found');
-      }
+      final securityDoc = await _securityDocRef(userId).get();
+      final securityData = securityDoc.data() ?? {};
+      String? secret = securityData['twoFactorSecret'] as String?;
+      List<String>? hashedCodes = (securityData['recoveryCodes'] as List?)?.cast<String>();
 
-      final data = doc.data()!;
-      final secret = data['twoFactorSecret'] as String?;
-      final hashedCodes = (data['recoveryCodes'] as List?)?.cast<String>();
+      // Backward compatibility: read legacy fields from /users/{uid} if needed.
+      if (secret == null) {
+        final legacyUserDoc = await _firestore.collection('users').doc(userId).get();
+        if (!legacyUserDoc.exists) {
+          throw Exception('User not found');
+        }
+        final legacyData = legacyUserDoc.data()!;
+        secret = legacyData['twoFactorSecret'] as String?;
+        hashedCodes ??= (legacyData['recoveryCodes'] as List?)?.cast<String>();
+      }
 
       if (secret == null) {
         throw Exception('2FA not configured');
@@ -257,8 +281,9 @@ class TwoFactorService {
           if (verifyRecoveryCode(code, hashedCodes[i])) {
             // Remove used recovery code
             hashedCodes.removeAt(i);
-            await _firestore.collection('users').doc(userId).update({
+            await _securityDocRef(userId).update({
               'recoveryCodes': hashedCodes,
+              'updatedAt': FieldValue.serverTimestamp(),
             });
 
             AppLogger.info('Recovery code used for user $userId');
@@ -280,11 +305,15 @@ class TwoFactorService {
       final user = _auth.currentUser;
       if (user == null) return 0;
 
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (!doc.exists) return 0;
+      final doc = await _securityDocRef(user.uid).get();
+      final data = doc.data() ?? {};
+      List? codes = data['recoveryCodes'] as List?;
 
-      final data = doc.data()!;
-      final codes = data['recoveryCodes'] as List?;
+      if (codes == null) {
+        final legacyUserDoc = await _firestore.collection('users').doc(user.uid).get();
+        final legacyData = legacyUserDoc.data() ?? {};
+        codes = legacyData['recoveryCodes'] as List?;
+      }
 
       return codes?.length ?? 0;
     } catch (e) {
@@ -303,9 +332,15 @@ class TwoFactorService {
       }
 
       // Verify code before regenerating
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-      final data = doc.data()!;
-      final secret = data['twoFactorSecret'] as String?;
+      final doc = await _securityDocRef(user.uid).get();
+      final data = doc.data() ?? {};
+      String? secret = data['twoFactorSecret'] as String?;
+
+      if (secret == null) {
+        final legacyUserDoc = await _firestore.collection('users').doc(user.uid).get();
+        final legacyData = legacyUserDoc.data() ?? {};
+        secret = legacyData['twoFactorSecret'] as String?;
+      }
 
       if (secret == null || !verifyCode(secret, verificationCode)) {
         throw Exception('Invalid verification code');
@@ -316,9 +351,10 @@ class TwoFactorService {
       final hashedCodes = newCodes.map((code) => hashRecoveryCode(code)).toList();
 
       // Update Firestore
-      await _firestore.collection('users').doc(user.uid).update({
+      await _securityDocRef(user.uid).update({
         'recoveryCodes': hashedCodes,
         'recoveryCodesRegeneratedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       AppLogger.info('Recovery codes regenerated for user ${user.uid}');
