@@ -29,11 +29,12 @@ async function verifyRecaptchaToken(token, remoteip = null) {
 
   if (!RECAPTCHA_SECRET_KEY) {
     console.error('RECAPTCHA_SECRET_KEY not configured');
-    // Fail open - don't block users if not configured
+    // Fail closed when server secret is not configured
     return {
-      success: true,
-      score: 0.5,
+      success: false,
+      score: 0.0,
       action: 'unknown',
+      'error-codes': ['secret-not-configured'],
     };
   }
 
@@ -74,10 +75,10 @@ async function verifyRecaptchaToken(token, remoteip = null) {
     };
   } catch (error) {
     console.error('reCAPTCHA verification error:', error.message);
-    // Fail open - don't block users if verification service fails
+    // Fail closed when verification service fails
     return {
-      success: true,
-      score: 0.5,
+      success: false,
+      score: 0.0,
       action: 'unknown',
       'error-codes': ['network-error'],
     };
@@ -174,13 +175,13 @@ async function verifyMessageCaptcha(token, remoteip = null) {
 async function verifyRecaptchaCallable(data, context) {
   // Check authentication for sensitive operations
   if (!context.auth && data.action !== 'signup') {
-    throw new Error('UNAUTHENTICATED');
+    throw new Error('unauthenticated');
   }
 
   const {token, action} = data;
 
   if (!token) {
-    throw new Error('CAPTCHA token is required');
+    throw new Error('invalid-argument: CAPTCHA token is required');
   }
 
   // Get remote IP if available

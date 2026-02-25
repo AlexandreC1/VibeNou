@@ -1,5 +1,6 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/app_logger.dart';
 
 /// CAPTCHA and bot prevention service using Firebase App Check
@@ -22,12 +23,13 @@ class CaptchaService {
     try {
       // Activate App Check
       await _appCheck.activate(
-        // Use debug provider in debug mode for testing
-        androidProvider: AndroidProvider.debug,
-        appleProvider: AppleProvider.debug,
-        // In production, use:
-        // androidProvider: AndroidProvider.playIntegrity,
-        // appleProvider: AppleProvider.deviceCheck,
+        // Use debug providers only in non-release builds
+        androidProvider: kReleaseMode
+            ? AndroidProvider.playIntegrity
+            : AndroidProvider.debug,
+        appleProvider: kReleaseMode
+            ? AppleProvider.deviceCheck
+            : AppleProvider.debug,
       );
 
       // Set debug token if provided (for testing)
@@ -70,10 +72,10 @@ class CaptchaService {
       );
     } catch (e) {
       AppLogger.error('CAPTCHA verification failed', e);
-      // Fail open - don't block users if verification service fails
+      // Fail closed on verification failure
       return CaptchaVerificationResult(
-        success: true,
-        score: 0.5,
+        success: false,
+        score: 0.0,
         action: 'signup',
       );
     }
@@ -95,9 +97,7 @@ class CaptchaService {
 
       if (token == null) {
         AppLogger.warning('App Check token is null - potential bot');
-        // In production, you might want to reject this
-        // For now, fail open to not block legitimate users
-        return true;
+        return false;
       }
 
       AppLogger.info('App Check token obtained for action: $action');
@@ -107,8 +107,8 @@ class CaptchaService {
       return true;
     } catch (e) {
       AppLogger.error('App Check verification failed', e);
-      // Fail open - don't block users if service fails
-      return true;
+      // Fail closed on verification errors
+      return false;
     }
   }
 
