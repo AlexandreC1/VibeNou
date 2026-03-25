@@ -111,23 +111,127 @@ class PasswordValidator {
   }
 
   /// Check if password is in common password list
+  ///
+  /// Expanded list based on most commonly breached passwords
+  /// Source: Compilation of top leaked passwords from security breaches
   static bool _isCommonPassword(String password) {
     const commonPasswords = [
+      // Top 10 most common
       'password',
       '12345678',
       'qwerty',
-      'abc123',
+      '123456789',
+      '12345',
+      '1234567',
       'password1',
+      '123456',
+      'qwerty123',
+      '1q2w3e4r',
+
+      // Common patterns
+      'abc123',
+      'password123',
+      'qwertyuiop',
+      'asdfghjkl',
+      '1234567890',
+      '123123',
+      '000000',
+      '1111111',
+      'zxcvbnm',
+      'asdfgh',
+
+      // Common words
       'letmein',
       'welcome',
       'monkey',
-      '1234567890',
-      'password123',
+      'dragon',
+      'master',
+      'sunshine',
+      'princess',
+      'football',
+      'baseball',
+      'superman',
+      'batman',
+      'trustno1',
+      'freedom',
+      'whatever',
+      'starwars',
+
+      // Admin/system defaults
       'admin',
       'root',
       'user',
       'pass',
       'test',
+      'admin123',
+      'administrator',
+      'password!',
+      'pass123',
+      'changeme',
+      'default',
+      'guest',
+
+      // Keyboard patterns
+      'qweasd',
+      'asdzxc',
+      'zxcasd',
+      '1qaz2wsx',
+      'qazwsx',
+      'qwaszx',
+      'zaq12wsx',
+
+      // Years and dates
+      '2024',
+      '2023',
+      '2022',
+      '2021',
+      '2020',
+      '1234',
+      '0000',
+
+      // Simple variations
+      'password!',
+      'password@',
+      'password#',
+      'p@ssword',
+      'p@ssw0rd',
+      'passw0rd',
+      'passw@rd',
+
+      // Social media related
+      'iloveyou',
+      'loveyou',
+      'fuckyou',
+      'fuckoff',
+      'asshole',
+
+      // Sports teams (common)
+      'lakers',
+      'yankees',
+      'patriots',
+
+      // Simple sequences
+      'abcdef',
+      'fedcba',
+      '654321',
+      'abcd1234',
+
+      // Tech related
+      'computer',
+      'internet',
+      'samsung',
+      'android',
+      'google',
+      'microsoft',
+      'windows',
+      'linux',
+
+      // Names (very common)
+      'michael',
+      'jennifer',
+      'jordan',
+      'thomas',
+      'robert',
     ];
 
     return commonPasswords.contains(password);

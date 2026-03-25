@@ -2,35 +2,59 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // ========== Helper Functions ==========
+
+    // Validate file size (max 5MB for profile pictures)
+    function isValidFileSize() {
+      return request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Validate file is an image (JPEG, PNG, WebP)
+    function isValidImageType() {
+      return request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ========== Profile Pictures ==========
+
     // Profile pictures - users can upload their own
     match /profile_pictures/{userId}_{timestamp}.jpg {
       // Allow authenticated users to read any profile picture
-      allow read: if request.auth != null;
+      allow read: if isAuthenticated();
 
-      // Allow users to upload/update their own profile pictures
-      allow write: if request.auth != null &&
-                      userId == request.auth.uid;
+      // Allow users to upload/update ONLY their own profile pictures
+      // with file validation
+      allow write: if isAuthenticated() &&
+                      userId == request.auth.uid &&
+                      isValidFileSize() &&
+                      isValidImageType();
     }
 
     // Profile pictures - original naming scheme (profile_userId.jpg)
     match /profile_pictures/profile_{userId}.jpg {
       // Allow authenticated users to read any profile picture
-      allow read: if request.auth != null;
+      allow read: if isAuthenticated();
 
-      // Allow users to upload/update their own profile picture
-      allow write: if request.auth != null &&
-                      userId == request.auth.uid;
+      // Allow users to upload/update ONLY their own profile picture
+      // with file validation
+      allow write: if isAuthenticated() &&
+                      userId == request.auth.uid &&
+                      isValidFileSize() &&
+                      isValidImageType();
     }
 
-    // General profile_pictures directory access
-    match /profile_pictures/{allPaths=**} {
-      // Allow authenticated users to read profile pictures
-      allow read: if request.auth != null;
-
-      // Allow authenticated users to write their own files
-      // This catches any file naming patterns not covered above
-      allow write: if request.auth != null;
-    }
+    // ========== SECURITY: Catch-all rule removed ==========
+    // The previous overly-permissive catch-all rule has been removed.
+    // Only the specific patterns above are now allowed.
+    // This prevents users from:
+    // - Uploading files with arbitrary names
+    // - Overwriting other users' files
+    // - Uploading non-image files
+    // - Uploading files larger than 5MB
 
     // Default: deny all other access
     match /{allPaths=**} {

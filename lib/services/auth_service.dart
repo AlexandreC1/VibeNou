@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 import '../config/env_config.dart';
 import '../utils/app_logger.dart';
+import '../utils/input_sanitizer.dart';
 import 'encryption_service.dart';
 import 'key_storage_service.dart';
 import 'notification_service.dart';
@@ -48,6 +49,19 @@ class AuthService {
     String preferredLanguage = 'en',
     String? gender,
   }) async {
+    // SECURITY: Sanitize all user inputs to prevent XSS and injection attacks
+    final sanitizedName = InputSanitizer.sanitizeName(name);
+    final sanitizedBio = InputSanitizer.sanitizeBio(bio);
+    final sanitizedInterests = InputSanitizer.sanitizeInterestList(interests);
+    final sanitizedGender = gender != null ? InputSanitizer.sanitizeText(gender, maxLength: 20) : null;
+
+    // Check for malicious content
+    if (InputSanitizer.containsMaliciousContent(name) ||
+        InputSanitizer.containsMaliciousContent(bio)) {
+      AppLogger.warning('Signup blocked: Malicious content detected for $email');
+      throw Exception('Invalid input detected. Please remove special characters and try again.');
+    }
+
     // Verify user is human (bot prevention)
     final isHuman = await CaptchaService.verifySignup();
     if (!isHuman) {
@@ -79,18 +93,18 @@ class AuthService {
           // Continue without encryption - not critical for signup
         }
 
-        // Create user profile in Firestore
+        // Create user profile in Firestore with sanitized data
         UserModel userModel = UserModel(
           uid: user.uid,
           email: email,
-          name: name,
+          name: sanitizedName,
           age: age,
-          bio: bio,
-          interests: interests,
+          bio: sanitizedBio,
+          interests: sanitizedInterests,
           createdAt: DateTime.now(),
           lastActive: DateTime.now(),
           preferredLanguage: preferredLanguage,
-          gender: gender,
+          gender: sanitizedGender,
           publicKey: publicKey, // Store public key in Firestore
         );
 
@@ -361,9 +375,21 @@ class AuthService {
   // Update user profile
   Future<void> updateUserProfile(UserModel user) async {
     try {
-      await _firestore.collection('users').doc(user.uid).update(user.toMap());
+      // SECURITY: Sanitize profile data before updating
+      final profileData = user.toMap();
+      final sanitizedData = InputSanitizer.sanitizeProfileData(profileData);
+
+      // Check for malicious content
+      if (InputSanitizer.containsMaliciousContent(user.name) ||
+          InputSanitizer.containsMaliciousContent(user.bio)) {
+        AppLogger.warning('Profile update blocked: Malicious content detected for user ${user.uid}');
+        throw Exception('Invalid input detected. Please remove special characters and try again.');
+      }
+
+      await _firestore.collection('users').doc(user.uid).update(sanitizedData);
+      AppLogger.info('Profile updated successfully for user ${user.uid}');
     } catch (e) {
-      AppLogger.info('Update profile error: $e');
+      AppLogger.error('Update profile error', e);
       rethrow;
     }
   }

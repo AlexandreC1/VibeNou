@@ -1,117 +1,63 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import '../utils/app_logger.dart';
 
+/// RewardsService - Secure reward system using Cloud Functions
+///
+/// SECURITY UPDATE (2026-03-24):
+/// This service now uses Cloud Functions for all reward operations to prevent
+/// client-side manipulation. All date calculations and validation happen
+/// server-side where they cannot be tampered with.
+///
+/// Migration from client-side to server-side:
+/// - Reward claims now go through claimDailyReward Cloud Function
+/// - All date/time validation is server-side
+/// - Firestore rules prevent direct writes to reward fields
+/// - Prevents cheating and manipulation
 class RewardsService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
-  // Check and award daily login reward
+  /// Claim daily login reward (SECURE - Server-side)
+  ///
+  /// This method calls the Cloud Function which:
+  /// - Validates using server timestamp (can't be manipulated)
+  /// - Calculates streak server-side
+  /// - Awards points atomically
+  /// - Records history
+  ///
+  /// Returns reward result or null on error
   Future<Map<String, dynamic>?> checkDailyLoginReward(String userId) async {
     try {
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+      AppLogger.info('Claiming daily reward for user $userId via Cloud Function');
 
-      if (!userDoc.exists) return null;
+      // Call Cloud Function to claim reward
+      final callable = _functions.httpsCallable('claimDailyReward');
+      final result = await callable.call();
 
-      final data = userDoc.data()!;
-      final lastLogin = (data['lastLoginReward'] as Timestamp?)?.toDate();
-      final currentStreak = data['loginStreak'] ?? 0;
-      final totalPoints = data['rewardPoints'] ?? 0;
+      final data = result.data as Map<String, dynamic>;
 
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-
-      // Check if reward already claimed today
-      if (lastLogin != null) {
-        final lastLoginDate = DateTime(
-          lastLogin.year,
-          lastLogin.month,
-          lastLogin.day,
-        );
-
-        if (lastLoginDate == today) {
-          // Already claimed today
-          return {
-            'alreadyClaimed': true,
-            'streak': currentStreak,
-            'points': totalPoints,
-          };
-        }
-
-        // Check if streak continues (logged in yesterday)
-        final yesterday = today.subtract(const Duration(days: 1));
-        final isConsecutive = lastLoginDate == yesterday;
-
-        final newStreak = isConsecutive ? currentStreak + 1 : 1;
-        final pointsToAward = _calculateRewardPoints(newStreak);
-
-        // Update user data
-        await _firestore.collection('users').doc(userId).update({
-          'lastLoginReward': FieldValue.serverTimestamp(),
-          'loginStreak': newStreak,
-          'rewardPoints': FieldValue.increment(pointsToAward),
-        });
-
-        // Record reward history
-        await _firestore
-            .collection('users')
-            .doc(userId)
-            .collection('rewardHistory')
-            .add({
-          'type': 'daily_login',
-          'points': pointsToAward,
-          'streak': newStreak,
-          'claimedAt': FieldValue.serverTimestamp(),
-        });
-
+      if (data['success'] == true) {
+        AppLogger.info('Daily reward claim successful: ${data['message']}');
         return {
-          'alreadyClaimed': false,
-          'streak': newStreak,
-          'points': totalPoints + pointsToAward,
-          'earnedPoints': pointsToAward,
-          'isNewStreak': !isConsecutive,
+          'alreadyClaimed': data['alreadyClaimed'] ?? false,
+          'streak': data['streak'] ?? 0,
+          'points': data['points'] ?? 0,
+          'earnedPoints': data['earnedPoints'] ?? 0,
+          'isNewStreak': data['isNewStreak'] ?? false,
         };
       } else {
-        // First time login reward
-        const pointsToAward = 10;
-
-        await _firestore.collection('users').doc(userId).update({
-          'lastLoginReward': FieldValue.serverTimestamp(),
-          'loginStreak': 1,
-          'rewardPoints': FieldValue.increment(pointsToAward),
-        });
-
-        await _firestore
-            .collection('users')
-            .doc(userId)
-            .collection('rewardHistory')
-            .add({
-          'type': 'daily_login',
-          'points': pointsToAward,
-          'streak': 1,
-          'claimedAt': FieldValue.serverTimestamp(),
-        });
-
-        return {
-          'alreadyClaimed': false,
-          'streak': 1,
-          'points': pointsToAward,
-          'earnedPoints': pointsToAward,
-          'isNewStreak': true,
-        };
+        AppLogger.warning('Daily reward claim failed: ${data['message']}');
+        return null;
       }
+    } on FirebaseFunctionsException catch (e) {
+      AppLogger.error('Cloud Function error claiming daily reward', e);
+      AppLogger.error('Code: ${e.code}, Message: ${e.message}');
+      return null;
     } catch (e) {
+      AppLogger.error('Error claiming daily reward', e);
       return null;
     }
-  }
-
-  // Calculate reward points based on streak
-  int _calculateRewardPoints(int streak) {
-    if (streak <= 0) return 10;
-
-    // Base points: 10
-    // Bonus: +2 points per streak day (max +20 for 10+ days)
-    final bonus = (streak - 1) * 2;
-    final cappedBonus = bonus > 20 ? 20 : bonus;
-
-    return 10 + cappedBonus;
   }
 
   // Get reward history
@@ -139,22 +85,51 @@ class RewardsService {
     }
   }
 
-  // Get user points and streak
-  Future<Map<String, int>> getUserRewardStats(String userId) async {
+  /// Get user reward stats (SECURE - Server-side)
+  ///
+  /// Fetches current points, streak, and whether reward can be claimed today.
+  /// Uses Cloud Function to ensure accurate server-side date checking.
+  Future<Map<String, dynamic>> getUserRewardStats(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      AppLogger.debug('Fetching reward stats for user $userId via Cloud Function');
 
-      if (!doc.exists) {
-        return {'points': 0, 'streak': 0};
+      // Call Cloud Function to get stats
+      final callable = _functions.httpsCallable('getRewardStats');
+      final result = await callable.call();
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return {
+          'points': data['points'] ?? 0,
+          'streak': data['streak'] ?? 0,
+          'canClaimToday': data['canClaimToday'] ?? false,
+          'lastClaimDate': data['lastClaimDate'],
+        };
+      } else {
+        return {
+          'points': 0,
+          'streak': 0,
+          'canClaimToday': true,
+          'lastClaimDate': null,
+        };
       }
-
-      final data = doc.data()!;
+    } on FirebaseFunctionsException catch (e) {
+      AppLogger.error('Cloud Function error getting reward stats', e);
       return {
-        'points': data['rewardPoints'] ?? 0,
-        'streak': data['loginStreak'] ?? 0,
+        'points': 0,
+        'streak': 0,
+        'canClaimToday': true,
+        'lastClaimDate': null,
       };
     } catch (e) {
-      return {'points': 0, 'streak': 0};
+      AppLogger.error('Error getting reward stats', e);
+      return {
+        'points': 0,
+        'streak': 0,
+        'canClaimToday': true,
+        'lastClaimDate': null,
+      };
     }
   }
 }

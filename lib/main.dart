@@ -106,7 +106,9 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'VibeNou',
             debugShowCheckedModeBanner: false,
-            theme: themeProvider.currentTheme,
+            theme: themeProvider.lightTheme,
+            darkTheme: themeProvider.darkTheme,
+            themeMode: themeProvider.themeMode,
             locale: languageProvider.locale,
         localizationsDelegates: const [
           AppLocalizations.delegate,
@@ -117,9 +119,15 @@ class MyApp extends StatelessWidget {
         supportedLocales: const [
           Locale('en', ''), // English
           Locale('fr', ''), // French
-          Locale('ht', ''), // Haitian Creole (Kreyòl Ayisyen)
+          // Note: Haitian Creole supported via AppLocalizations, but uses French for Material widgets
         ],
         localeResolutionCallback: (locale, supportedLocales) {
+          // Map Haitian Creole to French for Material widgets (buttons, dialogs, etc.)
+          // while AppLocalizations will still provide Haitian Creole app strings
+          if (locale?.languageCode == 'ht') {
+            return const Locale('fr', ''); // Use French Material widgets for Haitian Creole
+          }
+
           // Check if the current locale is supported
           for (var supportedLocale in supportedLocales) {
             if (supportedLocale.languageCode == locale?.languageCode) {

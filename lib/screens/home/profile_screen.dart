@@ -26,18 +26,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../models/profile_view_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_view_service.dart';
-import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/app_logger.dart';
-import '../../providers/language_provider.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../profile/edit_profile_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// ProfileScreen Widget
 ///
@@ -145,187 +142,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
-    }
-  }
-
-  Future<void> _changeLanguage(String languageCode) async {
-    if (!mounted) return;
-
-    AppLogger.info('ProfileScreen: Changing language to: $languageCode');
-
-    if (!mounted) return;
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    await languageProvider.setLocale(languageCode);
-
-    // Update user preference in Firestore
-    if (!mounted) return;
-    final authService = Provider.of<AuthService>(context, listen: false);
-    if (authService.currentUser != null) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(authService.currentUser!.uid)
-            .update({'preferredLanguage': languageCode});
-        AppLogger.info('ProfileScreen: Updated Firestore preferredLanguage to: $languageCode');
-      } catch (e) {
-        AppLogger.info('Error updating language preference: $e');
-      }
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Language updated to ${_getLanguageName(languageCode)}'),
-          backgroundColor: AppTheme.royalPurple,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-
-      // Force rebuild of the entire app to apply language change
-      setState(() {
-        _currentUser = _currentUser?.copyWith(preferredLanguage: languageCode);
-      });
-    }
-  }
-
-  String _getLanguageName(String code) {
-    switch (code) {
-      case 'en':
-        return 'English';
-      case 'fr':
-        return 'Français';
-      case 'ht':
-        return 'Kreyòl Ayisyen';
-      default:
-        return code;
-    }
-  }
-
-  Future<void> _updateLocation() async {
-    if (_currentUser == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update Location'),
-        content: const Text(
-          'This will update your location using your current GPS position. '
-          'Continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    try {
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Getting your location...'),
-            ],
-          ),
-          duration: Duration(seconds: 10),
-        ),
-      );
-
-      final locationService = LocationService();
-      final position = await locationService.getCurrentPosition();
-
-      if (position == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to get location. Please enable location services.'),
-              backgroundColor: AppTheme.coral,
-            ),
-          );
-        }
-        return;
-      }
-
-      // Get city name from coordinates
-      final addressData = await locationService.getAddressFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      final city = addressData?['city'] ?? 'Unknown';
-
-      // Update Firestore
-      if (!mounted) return;
-      final authService = Provider.of<AuthService>(context, listen: false);
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(authService.currentUser!.uid)
-          .update({
-        'location': GeoPoint(position.latitude, position.longitude),
-        'city': city,
-      });
-
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Location updated to: $city'),
-            backgroundColor: AppTheme.royalPurple,
-          ),
-        );
-
-        // Reload profile to show new location
-        _loadUserProfile();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating location: $e'),
-            backgroundColor: AppTheme.coral,
-          ),
-        );
-      }
-    }
-  }
 
   void _showImageGallery() {
     if (_currentUser == null) return;
@@ -450,6 +266,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         flexibleSpace: Container(
           decoration: BoxDecoration(gradient: gradient),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Settings',
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showEditProfile,
@@ -778,115 +608,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
-
-            // Settings
-            _buildSettingsSection(localizations),
-
-            const SizedBox(height: 16),
-
-            // Logout Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _logout,
-                  icon: const Icon(Icons.logout),
-                  label: Text(localizations.logout),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primaryRose,
-                    side: const BorderSide(color: AppTheme.primaryRose),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
+            const SizedBox(height: 80), // Extra space for floating action button
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSettingsSection(AppLocalizations localizations) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            localizations.settings,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: Text(localizations.language),
-                  subtitle: Text(_getLanguageName(_currentUser!.preferredLanguage)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _showLanguageSelector,
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.location_on),
-                  title: Text(localizations.location),
-                  subtitle: Text(_currentUser!.city ?? 'Not set'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _updateLocation,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLanguageSelector() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Language'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            String selectedLanguage = _currentUser!.preferredLanguage;
-            return RadioGroup<String>(
-              groupValue: selectedLanguage,
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => selectedLanguage = value);
-                  _changeLanguage(value);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RadioListTile<String>(
-                    title: Text('English'),
-                    value: 'en',
-                  ),
-                  RadioListTile<String>(
-                    title: Text('Français'),
-                    value: 'fr',
-                  ),
-                  RadioListTile<String>(
-                    title: Text('Kreyòl Ayisyen'),
-                    value: 'ht',
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
 
   Future<void> _showEditProfile({int initialTab = 0}) async {
     if (_currentUser == null) return;

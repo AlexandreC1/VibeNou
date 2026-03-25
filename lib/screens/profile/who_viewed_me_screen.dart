@@ -6,6 +6,7 @@ import '../../models/user_model.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/skeleton_loader.dart';
 
 class WhoViewedMeScreen extends StatefulWidget {
   const WhoViewedMeScreen({super.key});
@@ -55,7 +56,11 @@ class _WhoViewedMeScreenState extends State<WhoViewedMeScreen> {
             _profileViewService.getProfileViews(authService.currentUser!.uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 5,
+              itemBuilder: (context, index) => const SkeletonProfileViewItem(),
+            );
           }
 
           if (snapshot.hasError) {

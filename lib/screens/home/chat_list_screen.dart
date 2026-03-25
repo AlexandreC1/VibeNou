@@ -10,6 +10,7 @@ import '../../services/chat_service.dart';
 import '../../services/user_cache_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../chat/chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -43,7 +44,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         stream: _chatService.getChatRooms(authService.currentUser!.uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonChatList();
           }
 
           if (snapshot.hasError) {

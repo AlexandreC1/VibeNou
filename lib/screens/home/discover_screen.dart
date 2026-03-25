@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:confetti/confetti.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -9,12 +10,15 @@ import '../../services/user_service.dart';
 import '../../services/location_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../services/online_presence_service.dart';
+import '../../services/match_service.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/user_card.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../../widgets/online_counter_widget.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/swipeable_card_stack.dart';
 import '../chat/chat_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -30,7 +34,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final UserService _userService = UserService();
   final LocationService _locationService = LocationService();
   final OnlinePresenceService _presenceService = OnlinePresenceService();
+  final MatchService _matchService = MatchService();
   final TextEditingController _searchController = TextEditingController();
+  late ConfettiController _confettiController;
 
   List<UserModel> _nearbyUsers = [];
   List<UserModel> _filteredNearbyUsers = [];
@@ -42,12 +48,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   double _maxDistance = 50;
   int _minAge = 18;
   int _maxAge = 100;
+  bool _isSwipeMode = true; // Default to swipe mode (Tinder-style)
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _searchController.addListener(_filterUsers);
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _loadCurrentUser();
   }
 
@@ -64,6 +72,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -236,6 +245,203 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
+  Future<void> _handleLike(UserModel likedUser) async {
+    if (_currentUser == null) return;
+
+    HapticFeedbackUtil.success();
+    AppLogger.info('Liked ${likedUser.name}');
+
+    try {
+      final isMatch = await _matchService.likeUser(
+        currentUserId: _currentUser!.uid,
+        currentUserName: _currentUser!.name,
+        likedUserId: likedUser.uid,
+        likedUserName: likedUser.name,
+      );
+
+      if (isMatch && mounted) {
+        _showMatchDialog(likedUser);
+      }
+    } catch (e) {
+      AppLogger.error('Error liking user', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to like user. Please try again.'),
+            backgroundColor: AppTheme.coral,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handlePass(UserModel passedUser) async {
+    if (_currentUser == null) return;
+
+    HapticFeedbackUtil.lightImpact();
+    AppLogger.info('Passed ${passedUser.name}');
+
+    try {
+      await _matchService.passUser(
+        currentUserId: _currentUser!.uid,
+        passedUserId: passedUser.uid,
+      );
+    } catch (e) {
+      AppLogger.error('Error passing user', e);
+    }
+  }
+
+  void _showMatchDialog(UserModel matchedUser) {
+    _confettiController.play();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                gradient: AppTheme.loveGradient,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 20),
+                  const Icon(
+                    Icons.favorite,
+                    color: Colors.white,
+                    size: 80,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "It's a Match!",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'You and ${matchedUser.name} liked each other!',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundImage: _currentUser?.photoUrl != null
+                              ? CachedNetworkImageProvider(_currentUser!.photoUrl!)
+                              : null,
+                          backgroundColor: AppTheme.royalPurple,
+                          child: _currentUser?.photoUrl == null
+                              ? Text(
+                                  _currentUser!.name[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Icon(
+                        Icons.favorite,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundImage: matchedUser.photoUrl != null
+                              ? CachedNetworkImageProvider(matchedUser.photoUrl!)
+                              : null,
+                          backgroundColor: AppTheme.primaryRose,
+                          child: matchedUser.photoUrl == null
+                              ? Text(
+                                  matchedUser.name[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            otherUser: matchedUser,
+                            currentUser: _currentUser!,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_bubble),
+                    label: const Text('Send Message'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.royalPurple,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Keep Swiping',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Confetti
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                shouldLoop: false,
+                colors: const [
+                  AppTheme.primaryRose,
+                  AppTheme.royalPurple,
+                  AppTheme.coral,
+                  AppTheme.lavender,
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -248,6 +454,22 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               expandedHeight: 200,
               floating: false,
               pinned: true,
+              actions: [
+                // Toggle between swipe mode and list mode
+                IconButton(
+                  icon: Icon(
+                    _isSwipeMode ? Icons.view_list : Icons.style,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isSwipeMode = !_isSwipeMode;
+                    });
+                    HapticFeedbackUtil.lightImpact();
+                  },
+                  tooltip: _isSwipeMode ? 'Switch to List View' : 'Switch to Swipe Mode',
+                ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
                   localizations.discover,
@@ -635,33 +857,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Widget _buildNearbyTab(AppLocalizations localizations) {
     if (_isLoadingNearby) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                strokeWidth: 3,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Finding people nearby...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const SkeletonDiscoverScreen();
     }
 
     if (_filteredNearbyUsers.isEmpty && _nearbyUsers.isEmpty) {
@@ -776,6 +972,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       );
     }
 
+    // SWIPE MODE - Tinder-style cards
+    if (_isSwipeMode) {
+      return SwipeableCardStack(
+        users: _filteredNearbyUsers,
+        onLike: _handleLike,
+        onPass: _handlePass,
+        onTap: _showUserProfile,
+      );
+    }
+
+    // LIST MODE - Traditional list view
     return RefreshIndicator(
       onRefresh: () async {
         HapticFeedbackUtil.mediumImpact();
@@ -829,33 +1036,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   Widget _buildSimilarTab(AppLocalizations localizations) {
     if (_isLoadingSimilar) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: AppTheme.purpleGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                strokeWidth: 3,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Finding similar interests...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const SkeletonDiscoverScreen();
     }
 
     if (_filteredSimilarUsers.isEmpty && _similarUsers.isEmpty) {

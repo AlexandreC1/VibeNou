@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/fix_user_profile.dart';
 import '../utils/app_logger.dart';
-import '../widgets/haitian_heart_logo.dart';
+import '../widgets/vibenou_logo.dart';
+import 'onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -51,6 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
     final authService = Provider.of<AuthService>(context, listen: false);
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final prefs = await SharedPreferences.getInstance();
 
     // Check if user is logged in
     if (authService.currentUser != null) {
@@ -76,8 +79,21 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } else {
+      // Check if onboarding has been completed
+      final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
+        if (onboardingComplete) {
+          // Show login screen
+          Navigator.of(context).pushReplacementNamed('/login');
+        } else {
+          // Show onboarding screen for first-time users
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const OnboardingScreen(),
+            ),
+          );
+        }
       }
     }
   }
@@ -103,29 +119,11 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 🇭🇹 Haitian Heart Logo
-                  const HaitianHeartLogo(
-                    size: 140,
+                  // New Professional VibeNou Logo
+                  const VibeNouLogo(
+                    size: 160,
                     animate: true,
-                  ),
-                  const SizedBox(height: 30),
-                  const Text(
-                    'VibeNou',
-                    style: TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Connect with your community',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                      letterSpacing: 1,
-                    ),
+                    showWordmark: true,
                   ),
                   const SizedBox(height: 50),
                   const CircularProgressIndicator(

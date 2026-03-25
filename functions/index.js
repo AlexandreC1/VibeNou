@@ -1,6 +1,7 @@
 const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const {onCall} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onObjectFinalized} = require("firebase-functions/v2/storage");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -13,6 +14,9 @@ const auditLog = require("./src/auditLog");
 
 // Import CAPTCHA verification
 const captcha = require("./src/captcha");
+
+// Import daily rewards
+const dailyRewards = require("./src/dailyRewards");
 
 /**
  * Cloud Function to send push notifications when a notification is queued
@@ -226,4 +230,87 @@ exports.cleanupAuditLogs = onSchedule("every day 04:00", async (event) => {
  */
 exports.verifyRecaptcha = onCall(async (request) => {
   return await captcha.verifyRecaptchaCallable(request.data, request);
+});
+
+/**
+ * Callable function to claim daily login reward
+ * Secure server-side reward processing with streak tracking
+ */
+exports.claimDailyReward = onCall(async (request) => {
+  return await dailyRewards.claimDailyReward(request.data, request);
+});
+
+/**
+ * Callable function to get user's reward stats
+ * Returns current points, streak, and claim eligibility
+ */
+exports.getRewardStats = onCall(async (request) => {
+  return await dailyRewards.getRewardStats(request.data, request);
+});
+
+/**
+ * Storage trigger to enforce upload rate limiting
+ * Monitors file uploads and deletes files that exceed rate limits
+ * Prevents storage abuse and cost overruns
+ */
+exports.enforceUploadRateLimit = onObjectFinalized(async (event) => {
+  const filePath = event.data.name;
+  const contentType = event.data.contentType;
+
+  // Only monitor profile picture uploads
+  if (!filePath.startsWith('profile_pictures/')) {
+    return;
+  }
+
+  // Extract userId from file path
+  // Expected formats: profile_pictures/profile_userId.jpg or profile_pictures/userId_timestamp.jpg
+  let userId;
+  const fileName = filePath.split('/').pop();
+
+  if (fileName.startsWith('profile_')) {
+    // Format: profile_userId.jpg
+    userId = fileName.replace('profile_', '').replace('.jpg', '').replace('.png', '').replace('.webp', '');
+  } else {
+    // Format: userId_timestamp.jpg
+    userId = fileName.split('_')[0];
+  }
+
+  if (!userId) {
+    console.warn(`Could not extract userId from file path: ${filePath}`);
+    return;
+  }
+
+  try {
+    // Check rate limit (10 uploads per hour)
+    const rateLimitResult = await rateLimiter.checkRateLimit(userId, 'uploads');
+
+    if (!rateLimitResult.allowed) {
+      console.warn(`Upload rate limit exceeded for user ${userId}. Deleting file: ${filePath}`);
+
+      // Delete the uploaded file
+      const bucket = admin.storage().bucket(event.data.bucket);
+      await bucket.file(filePath).delete();
+
+      // Log security event
+      await admin.firestore().collection('security_events').add({
+        userId: userId,
+        eventType: 'upload_rate_limit_exceeded',
+        severity: 'medium',
+        description: `User exceeded upload rate limit (10 per hour). File deleted: ${filePath}`,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        metadata: {
+          filePath: filePath,
+          contentType: contentType,
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+      });
+
+      console.log(`File deleted and security event logged for user ${userId}`);
+    } else {
+      console.log(`Upload allowed for user ${userId}. Remaining: ${rateLimitResult.remaining}/10`);
+    }
+  } catch (error) {
+    console.error(`Error enforcing upload rate limit for ${userId}:`, error);
+    // Don't throw - allow upload to succeed if rate limiting fails (fail open)
+  }
 });

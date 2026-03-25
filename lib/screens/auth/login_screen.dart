@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/vibenou_logo.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -124,12 +125,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
+    final localizations = AppLocalizations.of(context)!;
     final emailController = TextEditingController(text: _emailController.text.trim());
 
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reset Password'),
+        title: Text(localizations.resetPassword),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -141,18 +143,18 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: localizations.email,
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: const OutlineInputBorder(),
               ),
             ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(localizations.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -204,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 );
               }
             },
-            child: const Text('Send Reset Link'),
+            child: Text(localizations.sendResetLink),
           ),
         ],
       ),
@@ -225,49 +227,55 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
 
-                  // Logo
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryRose.withValues(alpha: 0.3),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'VN',
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                  // New Professional Logo
+                  const Center(
+                    child: VibeNouLogo(
+                      size: 120,
+                      animate: true,
+                      showWordmark: false,
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
+
+                  // App Name
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [
+                        Color(0xFFFF4081),
+                        Color(0xFF9C27B0),
+                      ],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'VibeNou',
+                      style: TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
 
                   // Welcome text
                   Text(
                     localizations.welcome,
-                    style: Theme.of(context).textTheme.displaySmall,
+                    style: Theme.of(context).textTheme.titleLarge,
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
 
                   Text(
-                    'Connect with the Haitian community',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    localizations.connectCommunity,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
                     textAlign: TextAlign.center,
                   ),
 
@@ -332,9 +340,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: _showForgotPasswordDialog,
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(
+                      child: Text(
+                        localizations.forgotPassword,
+                        style: const TextStyle(
                           color: AppTheme.primaryRose,
                           fontWeight: FontWeight.w600,
                         ),
@@ -398,9 +406,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           return const Icon(Icons.g_mobiledata, size: 32);
                         },
                       ),
-                      label: const Text(
-                        'Continue with Google',
-                        style: TextStyle(
+                      label: Text(
+                        localizations.continueWithGoogle,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -421,7 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account? "),
+                      Text("${localizations.dontHaveAccount} "),
                       TextButton(
                         onPressed: () {
                           Navigator.push(

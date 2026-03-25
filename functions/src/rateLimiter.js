@@ -16,6 +16,7 @@ const RATE_LIMITS = {
   notifications: { limit: 60, windowSeconds: 60 },      // 60 notifications per minute
   reports: { limit: 10, windowSeconds: 3600 },          // 10 reports per hour
   blocks: { limit: 20, windowSeconds: 3600 },           // 20 blocks per hour
+  uploads: { limit: 10, windowSeconds: 3600 },          // 10 file uploads per hour (SECURITY: Prevent storage abuse)
 };
 
 /**

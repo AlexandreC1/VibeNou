@@ -55,7 +55,12 @@ service cloud.firestore {
                        request.resource.data.age <= 120 &&
                        request.resource.data.email is string &&
                        request.resource.data.interests is list &&
-                       request.resource.data.createdAt is timestamp;
+                       request.resource.data.createdAt is timestamp &&
+                       // Encryption keys (optional for backward compatibility)
+                       (!('identityPublicKey' in request.resource.data) ||
+                        request.resource.data.identityPublicKey is string) &&
+                       (!('signingPublicKey' in request.resource.data) ||
+                        request.resource.data.signingPublicKey is string);
 
       // Allow updating only your own document with field restrictions
       allow update: if isOwner(userId) &&
@@ -63,6 +68,9 @@ service cloud.firestore {
                        request.resource.data.uid == resource.data.uid &&
                        request.resource.data.email == resource.data.email &&
                        request.resource.data.createdAt == resource.data.createdAt &&
+                       // SECURITY: Prevent direct manipulation of reward fields (Cloud Functions only)
+                       // These fields can only be updated by Cloud Functions
+                       (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rewardPoints', 'loginStreak', 'lastLoginReward'])) &&
                        // Validate updatable fields
                        (
                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) ||
@@ -261,13 +269,22 @@ service cloud.firestore {
     }
 
     // ========== Daily Rewards Collection ==========
+    // DEPRECATED: This collection is no longer used.
+    // Reward data is now stored in the users collection and managed by Cloud Functions.
+    // Keeping this rule for backward compatibility, but denying all writes.
     match /dailyRewards/{userId} {
       allow read: if isOwner(userId);
+      // SECURITY: Only Cloud Functions can write reward data
+      // Clients must use the claimDailyReward callable function
+      allow write: if false;
+    }
 
-      // Users can only increment their streak (Cloud Functions validate the date)
-      allow write: if isOwner(userId) &&
-                      request.resource.data.userId == userId &&
-                      request.resource.data.lastClaimDate is timestamp;
+    // ========== Reward History Collection (per user) ==========
+    match /users/{userId}/rewardHistory/{rewardId} {
+      // Users can read their own reward history
+      allow read: if isOwner(userId);
+      // Only Cloud Functions can create reward history entries
+      allow write: if false;
     }
 
     // ========== Rate Limits Collection (Cloud Functions only) ==========
@@ -310,6 +327,24 @@ service cloud.firestore {
       // Users cannot read or write their own lockout status
       // Only Cloud Functions and backend can manage lockouts
       allow read, write: if false;
+    }
+
+    // ========== Security Events Collection ==========
+    match /security_events/{eventId} {
+      // Users can read their own security events
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      // Only the app (not Cloud Functions) can create security events
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.eventType is string &&
+                       request.resource.data.severity in ['low', 'medium', 'high', 'critical'] &&
+                       isValidString(request.resource.data.description, 1, 1000) &&
+                       request.resource.data.timestamp is timestamp;
+
+      // No updates or deletes
+      allow update, delete: if false;
     }
 
     // ========== Default: Deny All ==========

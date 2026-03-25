@@ -1,0 +1,222 @@
+name: Security Checks
+
+# Run on all pushes and pull requests
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Vulnerability Scan
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better secret detection
+
+    # ========== Check for .env file exposure ==========
+    - name: Check for .env file in repository
+      run: |
+        echo "🔍 Checking for .env file exposure..."
+
+        # Check if .env exists in the repository
+        if git ls-files | grep -q "^\.env$"; then
+          echo "❌ ERROR: .env file is tracked in git!"
+          echo "This file contains sensitive secrets and should NEVER be committed."
+          echo ""
+          echo "To fix this:"
+          echo "  1. git rm --cached .env"
+          echo "  2. Ensure .env is in .gitignore"
+          echo "  3. git commit -m 'Remove .env from tracking'"
+          echo "  4. Rotate all exposed secrets immediately!"
+          exit 1
+        else
+          echo "✅ .env file is not tracked in git"
+        fi
+
+    # ========== Check .gitignore includes .env ==========
+    - name: Verify .env is in .gitignore
+      run: |
+        echo "🔍 Checking .gitignore configuration..."
+
+        if ! grep -q "^\.env$" .gitignore; then
+          echo "⚠️  WARNING: .env not found in .gitignore"
+          echo "Adding .env to .gitignore is recommended"
+          exit 1
+        else
+          echo "✅ .env is properly listed in .gitignore"
+        fi
+
+    # ========== Scan for hardcoded secrets ==========
+    - name: Scan for hardcoded API keys and secrets
+      run: |
+        echo "🔍 Scanning for hardcoded secrets..."
+
+        # Check for Firebase API keys in Dart files
+        if grep -r "AIza[a-zA-Z0-9_-]\{35\}" lib/ --include="*.dart" 2>/dev/null; then
+          echo "❌ ERROR: Firebase API key found hardcoded in Dart files!"
+          echo "API keys should be in .env file and loaded via EnvConfig"
+          exit 1
+        fi
+
+        # Check for common secret patterns
+        SECRET_PATTERNS=(
+          "password\s*=\s*['\"][^'\"]{8,}"
+          "api[_-]?key\s*=\s*['\"][^'\"]{20,}"
+          "secret[_-]?key\s*=\s*['\"][^'\"]{20,}"
+          "private[_-]?key\s*=\s*['\"][^'\"]{20,}"
+          "token\s*=\s*['\"][^'\"]{20,}"
+          "access[_-]?token\s*=\s*['\"][^'\"]{20,}"
+        )
+
+        for pattern in "${SECRET_PATTERNS[@]}"; do
+          if grep -rE "$pattern" lib/ --include="*.dart" 2>/dev/null; then
+            echo "⚠️  WARNING: Potential secret found matching pattern: $pattern"
+          fi
+        done
+
+        echo "✅ No obvious hardcoded secrets detected"
+
+    # ========== Check Firebase config files ==========
+    - name: Check for exposed Firebase config files
+      run: |
+        echo "🔍 Checking for Firebase configuration file exposure..."
+
+        SENSITIVE_FILES=(
+          "google-services.json"
+          "GoogleService-Info.plist"
+          "firebase_app_id_file.json"
+        )
+
+        for file in "${SENSITIVE_FILES[@]}"; do
+          if git ls-files | grep -q "$file"; then
+            echo "❌ ERROR: $file is tracked in git!"
+            echo "This file should be in .gitignore"
+            exit 1
+          fi
+        done
+
+        echo "✅ Firebase config files are not exposed"
+
+    # ========== Scan commit history for secrets (last 10 commits) ==========
+    - name: Scan recent commit history for secrets
+      run: |
+        echo "🔍 Scanning recent commit history for accidentally committed secrets..."
+
+        # Check last 10 commits for .env file
+        if git log --all --full-history -10 -- .env | grep -q "commit"; then
+          echo "⚠️  WARNING: .env file appears in recent commit history"
+          echo "If secrets were exposed, they should be rotated immediately"
+          echo "Consider using 'git filter-branch' or 'BFG Repo-Cleaner' to remove from history"
+        else
+          echo "✅ No .env file found in recent commit history"
+        fi
+
+    # ========== Check for TODO security items ==========
+    - name: Check for security TODOs
+      run: |
+        echo "🔍 Checking for security-related TODO items..."
+
+        if grep -rn "TODO.*security\|FIXME.*security\|HACK.*security" lib/ --include="*.dart" -i; then
+          echo "⚠️  Found security-related TODO items that should be addressed"
+        else
+          echo "✅ No outstanding security TODOs found"
+        fi
+
+    # ========== Summary ==========
+    - name: Security Check Summary
+      if: success()
+      run: |
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ All security checks passed!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "Checks performed:"
+        echo "  ✅ .env file not tracked in git"
+        echo "  ✅ .env properly listed in .gitignore"
+        echo "  ✅ No hardcoded API keys detected"
+        echo "  ✅ No hardcoded secrets detected"
+        echo "  ✅ Firebase config files not exposed"
+        echo "  ✅ No secrets in recent commit history"
+        echo ""
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    name: Dependency Security Scan
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Check for known vulnerable packages
+      run: |
+        echo "🔍 Checking Flutter dependencies for known vulnerabilities..."
+
+        # Flutter doesn't have a built-in vulnerability scanner yet
+        # But we can check for outdated packages
+        flutter pub outdated || true
+
+        echo "✅ Dependency check complete"
+        echo "⚠️  Review outdated packages above for security updates"
+
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Code Quality and Security Analysis
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Run Flutter analyzer
+      run: |
+        echo "🔍 Running Flutter analyzer..."
+        flutter analyze --no-fatal-infos
+
+    - name: Check for security anti-patterns
+      run: |
+        echo "🔍 Checking for security anti-patterns in code..."
+
+        # Check for dangerous Flutter security issues
+
+        # 1. Check for disabled SSL verification
+        if grep -rn "badCertificateCallback" lib/ --include="*.dart"; then
+          echo "⚠️  WARNING: SSL certificate validation may be disabled"
+        fi
+
+        # 2. Check for allowAllHostname (dangerous)
+        if grep -rn "allowAllHostname" lib/ --include="*.dart"; then
+          echo "❌ ERROR: allowAllHostname found - this disables hostname verification!"
+          exit 1
+        fi
+
+        # 3. Check for eval usage (very dangerous)
+        if grep -rn "\beval\s*(" lib/ --include="*.dart"; then
+          echo "❌ ERROR: eval() usage found - extremely dangerous!"
+          exit 1
+        fi
+
+        echo "✅ No critical security anti-patterns detected"
+

@@ -10,6 +10,7 @@ import '../../services/supabase_image_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
+import '../../utils/input_sanitizer.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -285,6 +286,23 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       return;
     }
 
+    // SECURITY: Check for malicious content before saving
+    final name = _nameController.text.trim();
+    final bio = _bioController.text.trim();
+
+    if (InputSanitizer.containsMaliciousContent(name) ||
+        InputSanitizer.containsMaliciousContent(bio)) {
+      HapticFeedbackUtil.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid characters detected. Please remove HTML tags, scripts, or special characters.'),
+          backgroundColor: AppTheme.coral,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     // Haptic feedback when saving
@@ -306,11 +324,16 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         }
       }
 
+      // SECURITY: Sanitize inputs (server also validates, but this provides better UX)
+      final sanitizedName = InputSanitizer.sanitizeName(name);
+      final sanitizedBio = InputSanitizer.sanitizeBio(bio);
+      final sanitizedInterests = InputSanitizer.sanitizeInterestList(_selectedInterests);
+
       final updatedUser = widget.currentUser.copyWith(
-        name: _nameController.text.trim(),
-        bio: _bioController.text.trim(),
+        name: sanitizedName,
+        bio: sanitizedBio,
         age: int.parse(_ageController.text),
-        interests: _selectedInterests,
+        interests: sanitizedInterests,
         photoUrl: _photoUrl,
         photos: uploadedPhotoUrls,
         locationSharingEnabled: _locationSharingEnabled,
