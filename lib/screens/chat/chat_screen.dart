@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../l10n/app_localizations.dart';
-import '../../models/chat_message.dart';
+import '../../models/message.dart';
 import '../../models/user_model.dart';
 import '../../services/chat_service.dart';
 import '../../services/report_service.dart';
@@ -25,7 +25,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
-  late String _chatRoomId;
+  String? _chatRoomId;
   bool _isSending = false;
 
   @override
@@ -35,12 +35,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initChat() async {
-    _chatRoomId = await _chatService.createChatRoom(
-      widget.currentUser.uid,
-      widget.otherUser.uid,
-    );
+    _chatRoomId = await _chatService.getOrCreateChatRoom(widget.otherUser.id);
     // Mark messages as read
-    await _chatService.markAsRead(_chatRoomId, widget.currentUser.uid);
+    if (_chatRoomId != null) {
+      await _chatService.markMessagesAsRead(_chatRoomId!);
+    }
   }
 
   @override
@@ -50,7 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (_messageController.text.trim().isEmpty || _chatRoomId == null) return;
 
     final message = _messageController.text.trim();
     _messageController.clear();
@@ -59,10 +58,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       await _chatService.sendMessage(
-        chatRoomId: _chatRoomId,
-        senderId: widget.currentUser.uid,
-        receiverId: widget.otherUser.uid,
-        message: message,
+        chatRoomId: _chatRoomId!,
+        content: message,
       );
     } catch (e) {
       if (mounted) {
@@ -83,7 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (context) => ReportDialog(
         reportedUser: widget.otherUser,
-        reporterUserId: widget.currentUser.uid,
+        reporterUserId: widget.currentUser.id,
       ),
     );
   }
@@ -150,60 +147,67 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<ChatMessage>>(
-              stream: _chatService.getMessages(_chatRoomId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            child: _chatRoomId == null
+                ? const Center(child: CircularProgressIndicator())
+                : StreamBuilder<Message>(
+                    stream: _chatService.subscribeToMessages(_chatRoomId!),
+                    builder: (context, snapshot) {
+                      return FutureBuilder<List<Message>>(
+                        future: _chatService.getMessages(chatRoomId: _chatRoomId!),
+                        builder: (context, messagesSnapshot) {
+                          if (messagesSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
 
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
+                          if (messagesSnapshot.hasError) {
+                            return Center(child: Text('Error: ${messagesSnapshot.error}'));
+                          }
 
-                final messages = snapshot.data ?? [];
+                          final messages = messagesSnapshot.data ?? [];
 
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: AppTheme.textSecondary,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Say hi to start the conversation!',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  );
-                }
+                          if (messages.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.chat_bubble_outline,
+                                    size: 64,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No messages yet',
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Say hi to start the conversation!',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
 
-                return ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    final isMe = message.senderId == widget.currentUser.uid;
+                          return ListView.builder(
+                            reverse: true,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) {
+                              final message = messages[index];
+                              final isMe = message.senderId == widget.currentUser.id;
 
-                    return _MessageBubble(
-                      message: message,
-                      isMe: isMe,
-                    );
-                  },
-                );
-              },
-            ),
+                              return _MessageBubble(
+                                message: message,
+                                isMe: isMe,
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
           _buildMessageInput(localizations),
         ],
@@ -275,7 +279,7 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _MessageBubble extends StatelessWidget {
-  final ChatMessage message;
+  final Message message;
   final bool isMe;
 
   const _MessageBubble({
@@ -318,7 +322,7 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    message.message,
+                    message.content,
                     style: TextStyle(
                       color: isMe ? Colors.white : AppTheme.textPrimary,
                       fontSize: 15,
@@ -327,7 +331,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  timeago.format(message.timestamp),
+                  timeago.format(message.createdAt),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontSize: 11,
                       ),

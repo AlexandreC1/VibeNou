@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
-import '../../services/location_service.dart';
 import '../../utils/app_theme.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -77,14 +75,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final locationService = LocationService();
-
-      // Get user location
-      final position = await locationService.getCurrentPosition();
-      GeoPoint? geoPoint;
-      if (position != null) {
-        geoPoint = GeoPoint(position.latitude, position.longitude);
-      }
 
       await authService.signUp(
         email: _emailController.text.trim(),
@@ -102,15 +92,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         String errorMessage = 'Sign up failed';
 
-        // Parse Firebase errors
-        if (e.toString().contains('CONFIGURATION_NOT_FOUND')) {
-          errorMessage = 'Firebase Authentication is not configured. Please enable Email/Password sign-in in Firebase Console.';
-        } else if (e.toString().contains('email-already-in-use')) {
+        // Parse Supabase errors
+        if (e.toString().contains('User already registered')) {
           errorMessage = 'This email is already registered. Please login instead.';
-        } else if (e.toString().contains('weak-password')) {
-          errorMessage = 'Password is too weak. Please use a stronger password.';
-        } else if (e.toString().contains('invalid-email')) {
+        } else if (e.toString().contains('Password should be at least')) {
+          errorMessage = 'Password is too weak. Please use a stronger password (at least 6 characters).';
+        } else if (e.toString().contains('Invalid email')) {
           errorMessage = 'Invalid email address.';
+        } else if (e.toString().contains('at least 13 years old')) {
+          errorMessage = 'You must be at least 13 years old to sign up.';
         } else {
           errorMessage = 'Sign up failed: ${e.toString()}';
         }
@@ -372,8 +362,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 return 'Please enter your age';
               }
               final age = int.tryParse(value);
-              if (age == null || age < 18 || age > 100) {
-                return 'Please enter a valid age (18-100)';
+              if (age == null || age < 13 || age > 100) {
+                return 'Please enter a valid age (13-100)';
               }
               return null;
             },

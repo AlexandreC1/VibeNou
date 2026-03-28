@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -23,8 +22,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final UserService _userService = UserService();
   final LocationService _locationService = LocationService();
 
-  List<UserModel> _nearbyUsers = [];
-  List<Map<String, dynamic>> _similarUsers = [];
+  List<NearbyUser> _nearbyUsers = [];
+  List<SimilarInterestUser> _similarUsers = [];
   bool _isLoadingNearby = false;
   bool _isLoadingSimilar = false;
   UserModel? _currentUser;
@@ -45,7 +44,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Future<void> _loadCurrentUser() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (authService.currentUser != null) {
-      final user = await authService.getUserData(authService.currentUser!.uid);
+      final user = await authService.getCurrentUserProfile();
       setState(() {
         _currentUser = user;
       });
@@ -55,43 +54,45 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   Future<void> _loadNearbyUsers() async {
-    if (_currentUser == null || _currentUser!.location == null) {
-      // Request location permission
-      final position = await _locationService.getCurrentPosition();
-      if (position == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location permission required'),
-              backgroundColor: AppTheme.coral,
-            ),
-          );
-        }
-        return;
-      }
+    if (_currentUser == null) return;
 
-      // Update user location
-      final authService = Provider.of<AuthService>(context, listen: false);
-      if (authService.currentUser != null) {
-        await _userService.updateUserLocation(
-          authService.currentUser!.uid,
-          position,
-        );
-        _currentUser = _currentUser?.copyWith(
-          location: GeoPoint(position.latitude, position.longitude),
+    // Request location permission
+    final position = await _locationService.getCurrentPosition();
+    if (position == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission required'),
+            backgroundColor: AppTheme.coral,
+          ),
         );
       }
+      return;
     }
-
-    if (_currentUser?.location == null) return;
 
     setState(() => _isLoadingNearby = true);
 
     try {
+      // Get address info from position
+      final addressInfo = await _locationService.getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      // Update user location
+      await _userService.updateUserLocation(
+        userId: _currentUser!.id,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        city: addressInfo?['city'],
+        country: addressInfo?['country'],
+      );
+
+      // Fetch nearby users
       final users = await _userService.getNearbyUsers(
-        currentUserId: _currentUser!.uid,
-        userLocation: _currentUser!.location!,
-        radiusInKm: 50,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        radiusKm: 50,
       );
 
       setState(() {
@@ -109,9 +110,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     setState(() => _isLoadingSimilar = true);
 
     try {
-      final users = await _userService.getUsersBySimilarity(
-        currentUserId: _currentUser!.uid,
-        currentUserInterests: _currentUser!.interests,
+      final users = await _userService.getUsersBySimilarInterests(
+        interests: _currentUser!.interests,
       );
 
       setState(() {
@@ -192,26 +192,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _nearbyUsers.length,
         itemBuilder: (context, index) {
-          final user = _nearbyUsers[index];
-          double? distance;
-          if (_currentUser?.location != null && user.location != null) {
-            distance = _userService.calculateSimilarity(
-              [
-                _currentUser!.location!.latitude.toString(),
-                _currentUser!.location!.longitude.toString()
-              ],
-              [
-                user.location!.latitude.toString(),
-                user.location!.longitude.toString()
-              ],
-            );
-          }
+          final nearbyUser = _nearbyUsers[index];
+          final user = nearbyUser.user;
+          final distance = nearbyUser.distanceKm;
 
           return UserCard(
             user: user,
-            subtitle: distance != null
-                ? '${distance.toStringAsFixed(1)} km away'
-                : user.city ?? '',
+            subtitle: '${distance.toStringAsFixed(1)} km away',
             onTap: () => _showUserProfile(user),
           );
         },
@@ -256,13 +243,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         padding: const EdgeInsets.all(16),
         itemCount: _similarUsers.length,
         itemBuilder: (context, index) {
-          final userWithSimilarity = _similarUsers[index];
-          final user = userWithSimilarity['user'] as UserModel;
-          final similarity = userWithSimilarity['similarity'] as double;
+          final similarUser = _similarUsers[index];
+          final user = similarUser.user;
+          final commonInterests = similarUser.commonInterests;
 
           return UserCard(
             user: user,
-            subtitle: '${similarity.toStringAsFixed(0)}% similar interests',
+            subtitle: '$commonInterests common interests',
             onTap: () => _showUserProfile(user),
           );
         },

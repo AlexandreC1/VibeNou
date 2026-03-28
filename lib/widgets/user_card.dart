@@ -27,7 +27,7 @@ class UserCard extends StatelessWidget {
             children: [
               // Avatar
               Hero(
-                tag: 'user_${user.uid}',
+                tag: 'user_${user.id}',
                 child: CircleAvatar(
                   radius: 30,
                   backgroundColor: AppTheme.primaryBlue,

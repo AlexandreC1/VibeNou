@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../l10n/app_localizations.dart';
-import '../../models/chat_message.dart';
+import '../../models/chat_room.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
@@ -25,6 +25,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     final authService = Provider.of<AuthService>(context, listen: false);
+    final userService = Provider.of<UserService>(context, listen: false);
 
     if (authService.currentUser == null) {
       return Scaffold(
@@ -37,8 +38,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         title: Text(localizations.chat),
       ),
-      body: StreamBuilder<List<ChatRoom>>(
-        stream: _chatService.getChatRooms(authService.currentUser!.uid),
+      body: FutureBuilder<List<ChatRoom>>(
+        future: _chatService.getUserChatRooms(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -82,39 +83,46 @@ class _ChatListScreenState extends State<ChatListScreen> {
             itemCount: chatRooms.length,
             itemBuilder: (context, index) {
               final chatRoom = chatRooms[index];
-              final otherUserId = chatRoom.participants.firstWhere(
-                (id) => id != authService.currentUser!.uid,
-              );
+              final otherUserId = chatRoom.getOtherParticipantId(authService.currentUser!.id);
 
               return FutureBuilder<UserModel?>(
-                future: authService.getUserData(otherUserId),
+                future: userService.getUserProfile(otherUserId),
                 builder: (context, userSnapshot) {
                   if (!userSnapshot.hasData) {
                     return const SizedBox.shrink();
                   }
 
                   final otherUser = userSnapshot.data!;
-                  final unreadCount =
-                      chatRoom.unreadCount[authService.currentUser!.uid] ?? 0;
 
-                  return _ChatListTile(
-                    chatRoom: chatRoom,
-                    otherUser: otherUser,
-                    unreadCount: unreadCount,
-                    onTap: () async {
-                      final currentUser = await authService
-                          .getUserData(authService.currentUser!.uid);
-                      if (currentUser != null && mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(
-                              otherUser: otherUser,
-                              currentUser: currentUser,
-                            ),
-                          ),
-                        );
-                      }
+                  return FutureBuilder<int>(
+                    future: _chatService.getUnreadCount(chatRoom.id),
+                    builder: (context, unreadSnapshot) {
+                      final unreadCount = unreadSnapshot.data ?? 0;
+
+                      return FutureBuilder<UserModel?>(
+                        future: authService.getCurrentUserProfile(),
+                        builder: (context, currentUserSnapshot) {
+                          return _ChatListTile(
+                            chatRoom: chatRoom,
+                            otherUser: otherUser,
+                            unreadCount: unreadCount,
+                            onTap: () async {
+                              final currentUser = currentUserSnapshot.data ?? await authService.getCurrentUserProfile();
+                              if (currentUser != null && mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatScreen(
+                                      otherUser: otherUser,
+                                      currentUser: currentUser,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      );
                     },
                   );
                 },
@@ -158,7 +166,7 @@ class _ChatListTile extends StatelessWidget {
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
-        chatRoom.lastMessage,
+        'Tap to view messages',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
@@ -171,7 +179,7 @@ class _ChatListTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            timeago.format(chatRoom.lastMessageTime),
+            timeago.format(chatRoom.updatedAt),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           if (unreadCount > 0) ...[
