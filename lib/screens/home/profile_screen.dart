@@ -33,6 +33,7 @@ import '../../services/auth_service.dart';
 import '../../services/profile_view_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/image_gallery_viewer.dart';
+import '../../utils/page_transitions.dart';
 import '../profile/edit_profile_screen.dart';
 import '../settings/settings_screen.dart';
 

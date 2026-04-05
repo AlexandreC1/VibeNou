@@ -8,9 +8,12 @@ import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/user_cache_service.dart';
+import '../../services/online_presence_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/error_state.dart';
 import '../chat/chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -23,6 +26,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
   final UserCacheService _userCache = UserCacheService();
+  final OnlinePresenceService _presenceService = OnlinePresenceService();
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +42,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.chat),
+        title: Text(
+          localizations.chat,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        centerTitle: false,
+        elevation: 0,
       ),
       body: StreamBuilder<List<ChatRoom>>(
         stream: _chatService.getChatRooms(authService.currentUser!.uid),
@@ -48,60 +57,35 @@ class _ChatListScreenState extends State<ChatListScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Text('Error: ${snapshot.error}'),
+            return ErrorState.loadFailed(
+              onRetry: () => setState(() {}),
             );
           }
 
           final chatRooms = snapshot.data ?? [];
 
           if (chatRooms.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    size: 64,
-                    color: AppTheme.textSecondary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No chats yet',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Start a conversation by discovering new people',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+            return EmptyState.noMessages();
           }
 
-          // Extract all other user IDs from chat rooms
           final otherUserIds = chatRooms
               .map((room) => room.participants.firstWhere(
                     (id) => id != authService.currentUser!.uid,
                   ))
               .toList();
 
-          // Also cache current user to avoid duplicate fetch
           final allUserIds = [authService.currentUser!.uid, ...otherUserIds];
 
-          // Batch fetch all users at once (N+1 problem solved!)
           return FutureBuilder<Map<String, UserModel>>(
             future: _userCache.batchGetUsers(allUserIds),
             builder: (context, userMapSnapshot) {
               if (userMapSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SkeletonChatList();
               }
 
               if (userMapSnapshot.hasError) {
-                return Center(
-                  child: Text('Error loading users: ${userMapSnapshot.error}'),
+                return ErrorState.loadFailed(
+                  onRetry: () => setState(() {}),
                 );
               }
 
@@ -109,68 +93,83 @@ class _ChatListScreenState extends State<ChatListScreen> {
               final currentUser = userMap[authService.currentUser!.uid];
 
               if (currentUser == null) {
-                return const Center(child: Text('Error loading current user'));
+                return const ErrorState(
+                  title: 'Profile not found',
+                  message: 'Please try logging in again.',
+                );
               }
 
               return RefreshIndicator(
                 onRefresh: () async {
                   HapticFeedbackUtil.mediumImpact();
-                  // Stream auto-updates, so just provide haptic feedback
                   await Future.delayed(const Duration(milliseconds: 500));
                 },
                 child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   itemCount: chatRooms.length,
                   itemBuilder: (context, index) {
-                  final chatRoom = chatRooms[index];
-                  final otherUserId = chatRoom.participants.firstWhere(
-                    (id) => id != authService.currentUser!.uid,
-                  );
+                    final chatRoom = chatRooms[index];
+                    final otherUserId = chatRoom.participants.firstWhere(
+                      (id) => id != authService.currentUser!.uid,
+                    );
 
-                  final otherUser = userMap[otherUserId];
+                    final otherUser = userMap[otherUserId];
 
-                  if (otherUser == null) {
-                    return const SizedBox.shrink();
-                  }
+                    if (otherUser == null) {
+                      return const SizedBox.shrink();
+                    }
 
-                  final unreadCount =
-                      chatRoom.unreadCount[authService.currentUser!.uid] ?? 0;
+                    final unreadCount =
+                        chatRoom.unreadCount[authService.currentUser!.uid] ?? 0;
 
-                  // Animate each chat tile with staggered delay
-                  return TweenAnimationBuilder<double>(
-                    key: ValueKey(chatRoom.id),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: Duration(milliseconds: 300 + (index * 80)),
-                    curve: Curves.easeOut,
-                    builder: (context, value, child) {
-                      return Transform.translate(
-                        offset: Offset(-30 * (1 - value), 0),
-                        child: Opacity(
-                          opacity: value,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: _ChatListTile(
-                      chatRoom: chatRoom,
-                      otherUser: otherUser,
-                      unreadCount: unreadCount,
-                      onTap: () {
-                        if (mounted) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(
-                                otherUser: otherUser,
-                                currentUser: currentUser,
-                              ),
-                            ),
-                          );
-                        }
+                    return TweenAnimationBuilder<double>(
+                      key: ValueKey(chatRoom.id),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: Duration(milliseconds: 300 + (index * 60)),
+                      curve: Curves.easeOut,
+                      builder: (context, value, child) {
+                        return Transform.translate(
+                          offset: Offset(0, 20 * (1 - value)),
+                          child: Opacity(
+                            opacity: value,
+                            child: child,
+                          ),
+                        );
                       },
-                    ),
-                  );
-                },
-              ),
-            );
+                      child: _ModernChatTile(
+                        chatRoom: chatRoom,
+                        otherUser: otherUser,
+                        unreadCount: unreadCount,
+                        onTap: () {
+                          if (mounted) {
+                            Navigator.of(context).push(
+                              PageRouteBuilder(
+                                pageBuilder: (context, animation, secondaryAnimation) =>
+                                    ChatScreen(
+                                  otherUser: otherUser,
+                                  currentUser: currentUser,
+                                ),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(1, 0),
+                                      end: Offset.zero,
+                                    ).animate(CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeInOut,
+                                    )),
+                                    child: child,
+                                  );
+                                },
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+              );
             },
           );
         },
@@ -179,79 +178,161 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 }
 
-class _ChatListTile extends StatelessWidget {
+/// Modern chat list tile with online indicator, avatar, and unread badge.
+class _ModernChatTile extends StatelessWidget {
   final ChatRoom chatRoom;
   final UserModel otherUser;
   final int unreadCount;
   final VoidCallback onTap;
 
-  const _ChatListTile({
+  const _ModernChatTile({
     required this.chatRoom,
     required this.otherUser,
     required this.unreadCount,
     required this.onTap,
   });
 
+  bool get _isRecentlyActive {
+    final threshold = DateTime.now().subtract(const Duration(minutes: 5));
+    return otherUser.lastActive.isAfter(threshold);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: AppTheme.primaryRose,
-        backgroundImage: otherUser.photoUrl != null
-            ? CachedNetworkImageProvider(otherUser.photoUrl!)
-            : null,
-        child: otherUser.photoUrl == null
-            ? Text(
-                otherUser.name[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+    final hasUnread = unreadCount > 0;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            // Avatar with online indicator
+            Stack(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: hasUnread
+                        ? Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          )
+                        : null,
+                  ),
+                  child: CircleAvatar(
+                    radius: hasUnread ? 25 : 28,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                    backgroundImage: otherUser.photoUrl != null
+                        ? CachedNetworkImageProvider(otherUser.photoUrl!)
+                        : null,
+                    child: otherUser.photoUrl == null
+                        ? Text(
+                            otherUser.name.isNotEmpty
+                                ? otherUser.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
-              )
-            : null,
-      ),
-      title: Text(
-        otherUser.name,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        chatRoom.lastMessage,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-          color: unreadCount > 0 ? AppTheme.textPrimary : AppTheme.textSecondary,
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            timeago.format(chatRoom.lastMessageTime),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          if (unreadCount > 0) ...[
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.coral,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                unreadCount.toString(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+                // Online dot
+                if (_isRecentlyActive)
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          width: 2.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 14),
+
+            // Name + message
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    otherUser.name,
+                    style: TextStyle(
+                      fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    chatRoom.lastMessage,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                      color: hasUnread ? Colors.grey[800] : Colors.grey[500],
+                    ),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
+
+            // Time + unread badge
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  timeago.format(chatRoom.lastMessageTime, locale: 'en_short'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasUnread
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey[400],
+                    fontWeight: hasUnread ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                if (hasUnread) ...[
+                  const SizedBox(height: 6),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
-        ],
+        ),
       ),
-      onTap: onTap,
     );
   }
 }

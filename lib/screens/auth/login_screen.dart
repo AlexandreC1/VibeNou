@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/vibenou_logo.dart';
+import '../../utils/page_transitions.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,7 +16,10 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _bgController;
+  late Animation<Alignment> _bgAlignment;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -23,7 +27,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _bgController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _bgAlignment = TweenSequence<Alignment>([
+      TweenSequenceItem(
+        tween: Tween(begin: Alignment.topLeft, end: Alignment.topRight),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: Alignment.topRight, end: Alignment.bottomRight),
+        weight: 1,
+      ),
+    ]).animate(CurvedAnimation(parent: _bgController, curve: Curves.easeInOut));
+  }
+
+  @override
   void dispose() {
+    _bgController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -219,8 +244,26 @@ class _LoginScreenState extends State<LoginScreen> {
     final localizations = AppLocalizations.of(context)!;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
+      body: AnimatedBuilder(
+        animation: _bgAlignment,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: _bgAlignment.value,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.primaryRose.withValues(alpha: 0.05),
+                  Colors.white,
+                  Colors.white,
+                ],
+              ),
+            ),
+            child: child,
+          );
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Form(
@@ -435,9 +478,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => const SignUpScreen(),
-                            ),
+                            SlideRightRoute(page: const SignUpScreen()),
                           );
                         },
                         child: Text(localizations.signUp),
@@ -450,6 +491,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

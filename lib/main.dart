@@ -16,6 +16,7 @@ import 'services/captcha_service.dart';
 
 import 'l10n/app_localizations.dart';
 import 'config/router.dart';
+import 'widgets/error_boundary.dart';
 import 'services/auth_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
@@ -66,6 +67,9 @@ void main() async {
         AppLogger.warning('Supabase initialization failed: $e');
         AppLogger.info('Image uploads will use Firebase Storage instead.');
       }
+
+      // Configure error widget for production (graceful error display)
+      setupErrorWidget();
 
       runApp(const MyApp());
     },
