@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/email_verification_service.dart';
 import '../../utils/app_logger.dart';
@@ -50,7 +51,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       (isVerified) {
         if (isVerified && mounted) {
           // Email verified! Navigate to main screen
-          Navigator.of(context).pushReplacementNamed('/main');
+          context.go('/main');
         }
       },
       onError: (error) {
@@ -77,7 +78,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         // Navigate to main screen
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/main');
+          context.go('/main');
         }
       } else {
         setState(() {
@@ -143,7 +144,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     try {
       await _verificationService.signOutAndRetry();
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
+        context.go('/login');
       }
     } catch (e) {
       if (mounted) {

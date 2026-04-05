@@ -5,6 +5,10 @@ import '../utils/app_logger.dart';
 
 /// Service for batch fetching and caching user data to avoid N+1 query problems
 class UserCacheService {
+  static final UserCacheService _instance = UserCacheService._internal();
+  factory UserCacheService() => _instance;
+  UserCacheService._internal();
+
   final Map<String, UserModel> _cache = {};
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 

@@ -3,6 +3,10 @@ import '../models/profile_view_model.dart';
 import '../utils/app_logger.dart';
 
 class ProfileViewService {
+  static final ProfileViewService _instance = ProfileViewService._internal();
+  factory ProfileViewService() => _instance;
+  ProfileViewService._internal();
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Record a profile view

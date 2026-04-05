@@ -5,6 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/app_logger.dart';
 
 class SupabaseImageService {
+  static final SupabaseImageService _instance = SupabaseImageService._internal();
+  factory SupabaseImageService() => _instance;
+  SupabaseImageService._internal();
+
   SupabaseClient? get _supabase {
     try {
       return Supabase.instance.client;

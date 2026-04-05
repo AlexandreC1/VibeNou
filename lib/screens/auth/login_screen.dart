@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/auth_service.dart';
@@ -43,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (user != null && mounted) {
         themeProvider.updateTheme(user);
-        Navigator.of(context).pushReplacementNamed('/main');
+        context.go('/main');
       }
     } catch (e) {
       if (mounted) {
@@ -93,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (user != null && mounted) {
         themeProvider.updateTheme(user);
-        Navigator.of(context).pushReplacementNamed('/main');
+        context.go('/main');
       }
     } catch (e) {
       if (mounted) {

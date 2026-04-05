@@ -9,6 +9,10 @@ import '../utils/app_logger.dart';
 /// Psychology: People are more likely to engage when they see others are active.
 /// "247 people online now" is far more compelling than an empty-looking app.
 class OnlinePresenceService {
+  static final OnlinePresenceService _instance = OnlinePresenceService._internal();
+  factory OnlinePresenceService() => _instance;
+  OnlinePresenceService._internal();
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// How long before a user is considered offline (in minutes)

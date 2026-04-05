@@ -25,6 +25,12 @@ dependencies:
   # Supabase (for image storage)
   supabase_flutter: ^2.0.0
 
+  # Routing
+  go_router: ^14.2.0
+
+  # Animation Helpers
+  flutter_animate: ^4.5.0
+
   # State Management
   provider: ^6.1.1
 

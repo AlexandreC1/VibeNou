@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,7 @@ import '../../services/online_presence_service.dart';
 import '../../services/match_service.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/geohash.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/user_card.dart';
 import '../../widgets/image_gallery_viewer.dart';
@@ -36,6 +38,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final OnlinePresenceService _presenceService = OnlinePresenceService();
   final MatchService _matchService = MatchService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   late ConfettiController _confettiController;
 
   List<UserModel> _nearbyUsers = [];
@@ -54,7 +57,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _searchController.addListener(_filterUsers);
+    _searchController.addListener(_onSearchChanged);
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _loadCurrentUser();
   }
@@ -72,8 +75,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _searchDebounce?.cancel();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), _filterUsers);
   }
 
   void _filterUsers() {
@@ -995,15 +1004,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           final user = _filteredNearbyUsers[index];
           double? distance;
           if (_currentUser?.location != null && user.location != null) {
-            distance = _userService.calculateSimilarity(
-              [
-                _currentUser!.location!.latitude.toString(),
-                _currentUser!.location!.longitude.toString()
-              ],
-              [
-                user.location!.latitude.toString(),
-                user.location!.longitude.toString()
-              ],
+            distance = Geohash.distanceKm(
+              _currentUser!.location!.latitude,
+              _currentUser!.location!.longitude,
+              user.location!.latitude,
+              user.location!.longitude,
             );
           }
 

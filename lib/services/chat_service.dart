@@ -52,6 +52,10 @@ import 'notification_service.dart';
 /// This service is the single source of truth for all chat functionality.
 /// It integrates encryption, notifications, and Firestore operations.
 class ChatService {
+  static final ChatService _instance = ChatService._internal();
+  factory ChatService() => _instance;
+  ChatService._internal();
+
   // ========== DEPENDENCIES ==========
 
   /// Firestore instance for database operations

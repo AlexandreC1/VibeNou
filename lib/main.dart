@@ -15,9 +15,7 @@ import 'services/error_telemetry_service.dart';
 import 'services/captcha_service.dart';
 
 import 'l10n/app_localizations.dart';
-import 'screens/splash_screen.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/home/main_screen.dart';
+import 'config/router.dart';
 import 'services/auth_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
@@ -84,8 +82,15 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final _router = createRouter();
 
   @override
   Widget build(BuildContext context) {
@@ -103,44 +108,34 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (context, themeProvider, languageProvider, child) {
-          return MaterialApp(
+          return MaterialApp.router(
             title: 'VibeNou',
             debugShowCheckedModeBanner: false,
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
             locale: languageProvider.locale,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('en', ''), // English
-          Locale('fr', ''), // French
-          // Note: Haitian Creole supported via AppLocalizations, but uses French for Material widgets
-        ],
-        localeResolutionCallback: (locale, supportedLocales) {
-          // Map Haitian Creole to French for Material widgets (buttons, dialogs, etc.)
-          // while AppLocalizations will still provide Haitian Creole app strings
-          if (locale?.languageCode == 'ht') {
-            return const Locale('fr', ''); // Use French Material widgets for Haitian Creole
-          }
-
-          // Check if the current locale is supported
-          for (var supportedLocale in supportedLocales) {
-            if (supportedLocale.languageCode == locale?.languageCode) {
-              return supportedLocale;
-            }
-          }
-          // Fallback to English
-          return const Locale('en', '');
-        },
-            home: const SplashScreen(),
-            routes: {
-              '/login': (context) => const LoginScreen(),
-              '/main': (context) => const MainScreen(),
+            routerConfig: _router,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('en', ''),
+              Locale('fr', ''),
+            ],
+            localeResolutionCallback: (locale, supportedLocales) {
+              if (locale?.languageCode == 'ht') {
+                return const Locale('fr', '');
+              }
+              for (var supportedLocale in supportedLocales) {
+                if (supportedLocale.languageCode == locale?.languageCode) {
+                  return supportedLocale;
+                }
+              }
+              return const Locale('en', '');
             },
           );
         },

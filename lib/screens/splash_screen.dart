@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
@@ -8,7 +9,6 @@ import '../providers/language_provider.dart';
 import '../utils/fix_user_profile.dart';
 import '../utils/app_logger.dart';
 import '../widgets/vibenou_logo.dart';
-import 'onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -55,44 +55,32 @@ class _SplashScreenState extends State<SplashScreen>
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
 
-    // Check if user is logged in
     if (authService.currentUser != null) {
-      // Try to fix missing profile (temporary debug code)
       try {
         await fixCurrentUserProfile();
       } catch (e) {
         AppLogger.info('Note: Profile fix attempted: $e');
       }
 
-      // Load user data and set theme + language
       final userData = await authService.getUserData(authService.currentUser!.uid);
       if (userData != null) {
         themeProvider.updateTheme(userData);
 
-        // Set user's preferred language
         if (userData.preferredLanguage.isNotEmpty) {
-          AppLogger.info('SplashScreen: Setting language from user data: ${userData.preferredLanguage}');
           await languageProvider.setLocale(userData.preferredLanguage);
         }
       }
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
+        context.go('/main');
       }
     } else {
-      // Check if onboarding has been completed
       final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
 
       if (mounted) {
         if (onboardingComplete) {
-          // Show login screen
-          Navigator.of(context).pushReplacementNamed('/login');
+          context.go('/login');
         } else {
-          // Show onboarding screen for first-time users
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
-            ),
-          );
+          context.go('/onboarding');
         }
       }
     }
@@ -116,17 +104,16 @@ class _SplashScreenState extends State<SplashScreen>
             opacity: _fadeAnimation,
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: Column(
+              child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // New Professional VibeNou Logo
-                  const VibeNouLogo(
+                  VibeNouLogo(
                     size: 160,
                     animate: true,
                     showWordmark: true,
                   ),
-                  const SizedBox(height: 50),
-                  const CircularProgressIndicator(
+                  SizedBox(height: 50),
+                  CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ],

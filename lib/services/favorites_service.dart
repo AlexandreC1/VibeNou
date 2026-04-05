@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FavoritesService {
+  static final FavoritesService _instance = FavoritesService._internal();
+  factory FavoritesService() => _instance;
+  FavoritesService._internal();
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Add user to favorites

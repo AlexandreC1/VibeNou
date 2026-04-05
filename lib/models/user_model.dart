@@ -156,6 +156,10 @@ class UserModel {
   /// Derived from GPS coordinates
   final String? country;
 
+  /// Geohash encoded from location for efficient Firestore range queries.
+  /// Precision 7 (~150m accuracy). Updated when location changes.
+  final String? geohash;
+
   // ========== SECTION 3: ACCOUNT METADATA ==========
 
   /// Account creation timestamp
@@ -255,6 +259,7 @@ class UserModel {
     this.location,
     this.city,
     this.country,
+    this.geohash,
     required this.createdAt,
     required this.lastActive,
     this.preferredLanguage = 'en',
@@ -287,6 +292,7 @@ class UserModel {
       location: map['location'],
       city: map['city'],
       country: map['country'],
+      geohash: map['geohash'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastActive: (map['lastActive'] as Timestamp?)?.toDate() ?? DateTime.now(),
       preferredLanguage: map['preferredLanguage'] ?? 'en',
@@ -320,6 +326,7 @@ class UserModel {
       'location': location,
       'city': city,
       'country': country,
+      'geohash': geohash,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastActive': Timestamp.fromDate(lastActive),
       'preferredLanguage': preferredLanguage,
@@ -352,6 +359,7 @@ class UserModel {
     GeoPoint? location,
     String? city,
     String? country,
+    String? geohash,
     DateTime? createdAt,
     DateTime? lastActive,
     String? preferredLanguage,
@@ -380,6 +388,7 @@ class UserModel {
       location: location ?? this.location,
       city: city ?? this.city,
       country: country ?? this.country,
+      geohash: geohash ?? this.geohash,
       createdAt: createdAt ?? this.createdAt,
       lastActive: lastActive ?? this.lastActive,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,

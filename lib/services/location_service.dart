@@ -3,6 +3,10 @@ import 'package:geocoding/geocoding.dart';
 import '../utils/app_logger.dart';
 
 class LocationService {
+  static final LocationService _instance = LocationService._internal();
+  factory LocationService() => _instance;
+  LocationService._internal();
+
   // Check if location services are enabled
   Future<bool> isLocationServiceEnabled() async {
     return await Geolocator.isLocationServiceEnabled();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../l10n/app_localizations.dart';
@@ -111,7 +112,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (mounted && user != null) {
         themeProvider.updateTheme(user);
-        Navigator.of(context).pushReplacementNamed('/main');
+        context.go('/main');
       }
     } catch (e) {
       if (mounted) {

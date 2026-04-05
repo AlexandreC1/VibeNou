@@ -71,6 +71,12 @@ service cloud.firestore {
                        // SECURITY: Prevent direct manipulation of reward fields (Cloud Functions only)
                        // These fields can only be updated by Cloud Functions
                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rewardPoints', 'loginStreak', 'lastLoginReward'])) &&
+                       // Validate geohash field if present (string, max 12 chars)
+                       (
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['geohash']) ||
+                         (request.resource.data.geohash is string &&
+                          request.resource.data.geohash.size() <= 12)
+                       ) &&
                        // Validate updatable fields
                        (
                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) ||
