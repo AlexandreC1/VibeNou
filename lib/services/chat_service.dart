@@ -459,6 +459,43 @@ class ChatService {
     }
   }
 
+  /// Load older messages strictly before a given timestamp.
+  ///
+  /// Used by chat screen to load history when the user scrolls up
+  /// past the live stream window. Returns up to [limit] messages
+  /// in descending timestamp order (newest first).
+  Future<List<ChatMessage>> getMessagesBefore(
+    String chatRoomId, {
+    required DateTime before,
+    int limit = 25,
+    String? userId,
+    String? userPrivateKey,
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .startAfter([Timestamp.fromDate(before)])
+          .limit(limit)
+          .get();
+
+      var messages = snapshot.docs
+          .map((doc) => ChatMessage.fromMap(doc.data(), doc.id))
+          .toList();
+
+      if (userId != null && userPrivateKey != null) {
+        messages = await _decryptMessages(chatRoomId, messages, userId, userPrivateKey);
+      }
+
+      return messages;
+    } catch (e) {
+      AppLogger.error('Error loading older messages', e);
+      return [];
+    }
+  }
+
   // Get recent messages stream (for real-time updates)
   Stream<List<ChatMessage>> getRecentMessages(
     String chatRoomId, {

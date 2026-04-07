@@ -15,6 +15,9 @@ import '../../utils/app_theme.dart';
 import '../../utils/haptic_feedback_util.dart';
 import '../../widgets/report_dialog.dart';
 import '../../widgets/image_gallery_viewer.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/skeleton_loader.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel otherUser;
@@ -34,17 +37,82 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final SupabaseImageService _imageService = SupabaseImageService();
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String? _chatRoomId;
   bool _isSending = false;
   bool _isUploadingImage = false;
   Timer? _typingTimer;
   bool _isTyping = false;
 
+  // Message history pagination state
+  final List<ChatMessage> _olderMessages = [];
+  bool _loadingMoreHistory = false;
+  bool _hasMoreHistory = true;
+
   @override
   void initState() {
     super.initState();
     _initChat();
     _messageController.addListener(_onTextChanged);
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    // ListView is reversed: maxScrollExtent = visual top of chat
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_loadingMoreHistory &&
+        _hasMoreHistory) {
+      _loadMoreHistory();
+    }
+  }
+
+  Future<void> _loadMoreHistory() async {
+    if (_chatRoomId == null || _loadingMoreHistory || !_hasMoreHistory) return;
+
+    // Determine the cursor: oldest message currently visible
+    DateTime? oldestVisible;
+    if (_olderMessages.isNotEmpty) {
+      oldestVisible = _olderMessages.last.timestamp;
+    } else {
+      // Fall back to letting the next build pass set this from stream data
+      return;
+    }
+
+    setState(() => _loadingMoreHistory = true);
+    try {
+      final older = await _chatService.getMessagesBefore(
+        _chatRoomId!,
+        before: oldestVisible,
+        limit: 25,
+        userId: widget.currentUser.uid,
+      );
+      if (!mounted) return;
+      setState(() {
+        _olderMessages.addAll(older);
+        if (older.length < 25) _hasMoreHistory = false;
+      });
+    } catch (e) {
+      AppLogger.error('Failed to load chat history', e);
+    } finally {
+      if (mounted) setState(() => _loadingMoreHistory = false);
+    }
+  }
+
+  Future<void> _seedHistoryFromStream(List<ChatMessage> streamMessages) async {
+    if (_olderMessages.isNotEmpty || streamMessages.isEmpty) return;
+    final oldest = streamMessages.last.timestamp;
+    final older = await _chatService.getMessagesBefore(
+      _chatRoomId!,
+      before: oldest,
+      limit: 25,
+      userId: widget.currentUser.uid,
+    );
+    if (!mounted) return;
+    setState(() {
+      _olderMessages.addAll(older);
+      if (older.length < 25) _hasMoreHistory = false;
+    });
   }
 
   Future<void> _initChat() async {
@@ -87,6 +155,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingTimer?.cancel();
     _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _clearTypingStatus();
     super.dispose();
   }
@@ -568,58 +638,72 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       body: _chatRoomId == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonChatList()
           : Column(
         children: [
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
               stream: _chatService.getRecentMessages(
                 _chatRoomId!,
-                limit: 50,
+                limit: 30,
                 userId: widget.currentUser.uid,
                 userPrivateKey: null, // TODO: Pass private key when encryption is fully enabled
               ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const SkeletonChatList();
                 }
 
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return ErrorState.loadFailed(onRetry: () => setState(() {}));
                 }
 
-                final messages = snapshot.data ?? [];
+                final streamMessages = snapshot.data ?? [];
 
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: AppTheme.textSecondary,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Say hi to start the conversation!',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
+                // Seed older history once we have an oldest stream timestamp
+                if (streamMessages.isNotEmpty &&
+                    _olderMessages.isEmpty &&
+                    _hasMoreHistory &&
+                    !_loadingMoreHistory) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _seedHistoryFromStream(streamMessages),
                   );
                 }
 
+                if (streamMessages.isEmpty && _olderMessages.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'No messages yet',
+                    message: 'Say hi to start the conversation!',
+                  );
+                }
+
+                // Combined list: stream messages (newest) followed by
+                // older messages (oldest at end). Reverse=true so visual
+                // order shows newest at the bottom.
+                final messages = <ChatMessage>[
+                  ...streamMessages,
+                  ..._olderMessages,
+                ];
+
                 return ListView.builder(
+                  controller: _scrollController,
                   reverse: true,
                   padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
+                  itemCount: messages.length + (_loadingMoreHistory ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (index == messages.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    }
                     final message = messages[index];
                     final isMe = message.senderId == widget.currentUser.uid;
 

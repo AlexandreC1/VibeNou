@@ -74,14 +74,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Service for tracking who viewed the user's profile
   final ProfileViewService _profileViewService = ProfileViewService();
 
+  /// Scroll controller used to drive the parallax header effect.
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0;
+
   // ========== LIFECYCLE METHODS ==========
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      final newOffset = _scrollController.offset.clamp(0.0, 300.0);
+      if ((newOffset - _scrollOffset).abs() > 0.5) {
+        setState(() => _scrollOffset = newOffset);
+      }
+    });
     // Load profile data and view count on first render
     _loadUserProfile();
     _loadUnreadViewCount();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -292,23 +308,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           children: [
-            // Profile Header with animation
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut,
-              builder: (context, value, child) {
-                return Transform.translate(
-                  offset: Offset(0, 20 * (1 - value)),
-                  child: Opacity(
-                    opacity: value,
-                    child: child,
-                  ),
-                );
-              },
-              child: Container(
+            // Profile Header with parallax + entrance animation
+            Transform.translate(
+              offset: Offset(0, _scrollOffset * 0.4),
+              child: Opacity(
+                opacity: (1 - (_scrollOffset / 280)).clamp(0.0, 1.0),
+                child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: gradient,
@@ -395,6 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ],
                 ),
+              ),
               ),
             ),
 
