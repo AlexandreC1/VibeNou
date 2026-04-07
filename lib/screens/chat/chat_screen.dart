@@ -18,6 +18,7 @@ import '../../widgets/image_gallery_viewer.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/chat_bubble_shape.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserModel otherUser;
@@ -1006,18 +1007,28 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   )
                 else
-                  // Text message
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                  // Text message with tail-shaped bubble
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.72,
                     ),
-                    decoration: getBubbleDecoration(),
-                    child: Text(
-                      message.displayMessage,
-                      style: TextStyle(
-                        color: isMe ? Colors.white : AppTheme.textPrimary,
-                        fontSize: 15,
+                    child: BubbleBackground(
+                      isMe: isMe,
+                      gradient: isMe && message.isRead
+                          ? AppTheme.primaryGradient
+                          : null,
+                      solidColor: isMe
+                          ? (message.isRead
+                              ? null
+                              : AppTheme.textSecondary.withValues(alpha: 0.3))
+                          : AppTheme.backgroundColor,
+                      child: Text(
+                        message.displayMessage,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : AppTheme.textPrimary,
+                          fontSize: 15,
+                          height: 1.3,
+                        ),
                       ),
                     ),
                   ),

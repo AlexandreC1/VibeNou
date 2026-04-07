@@ -19,21 +19,39 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   final ChatService _chatService = ChatService();
   late final AnimationController _navAnimController;
 
-  late final List<Widget> _screens;
+  // Lazy tab loading: each slot is null until first visited, then kept alive.
+  final List<Widget?> _lazyScreens = [null, null, null];
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      const DiscoverScreen(),
-      const ChatListScreen(),
-      const ProfileScreen(),
-    ];
+    // Eagerly build the first tab only.
+    _lazyScreens[0] = const DiscoverScreen();
 
     _navAnimController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     )..forward();
+  }
+
+  Widget _buildTab(int index) {
+    if (_lazyScreens[index] != null) return _lazyScreens[index]!;
+    return const SizedBox.shrink();
+  }
+
+  void _ensureTabBuilt(int index) {
+    if (_lazyScreens[index] != null) return;
+    switch (index) {
+      case 0:
+        _lazyScreens[0] = const DiscoverScreen();
+        break;
+      case 1:
+        _lazyScreens[1] = const ChatListScreen();
+        break;
+      case 2:
+        _lazyScreens[2] = const ProfileScreen();
+        break;
+    }
   }
 
   @override
@@ -45,6 +63,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   void _onTabTapped(int index) {
     if (index == _currentIndex) return;
     setState(() {
+      _ensureTabBuilt(index);
       _currentIndex = index;
     });
     _navAnimController.forward(from: 0);
@@ -57,14 +76,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: _screens[_currentIndex],
-        ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildTab(0),
+          _buildTab(1),
+          _buildTab(2),
+        ],
       ),
       bottomNavigationBar: StreamBuilder<int>(
         stream: userId != null ? _chatService.getTotalUnreadCount(userId) : Stream.value(0),

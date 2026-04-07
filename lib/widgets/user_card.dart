@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/user_model.dart';
 import '../utils/app_theme.dart';
-import '../utils/haptic_feedback_util.dart';
+import 'animated_pressable.dart';
 
-class UserCard extends StatefulWidget {
+class UserCard extends StatelessWidget {
   final UserModel user;
   final String? subtitle;
   final VoidCallback onTap;
@@ -17,56 +17,31 @@ class UserCard extends StatefulWidget {
   });
 
   @override
-  State<UserCard> createState() => _UserCardState();
-}
-
-class _UserCardState extends State<UserCard> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _isPressed = true);
-        HapticFeedbackUtil.mediumImpact(); // Satisfying tap feedback
-      },
-      onTapUp: (_) {
-        setState(() => _isPressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryRose.withValues(alpha: 0.1),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(20),
-                splashColor: AppTheme.softPink.withValues(alpha: 0.3),
-                highlightColor: AppTheme.softPink.withValues(alpha: 0.1),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
+    return AnimatedPressable(
+      onTap: onTap,
+      pressedScale: 0.97,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryRose.withValues(alpha: 0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
                     children: [
                       // Avatar with gradient border
                       Hero(
-                        tag: 'user_${widget.user.uid}',
+                        tag: 'user_${user.uid}',
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -89,12 +64,12 @@ class _UserCardState extends State<UserCard> {
                             child: CircleAvatar(
                               radius: 32,
                               backgroundColor: AppTheme.primaryRose,
-                              backgroundImage: widget.user.photoUrl != null
-                                  ? CachedNetworkImageProvider(widget.user.photoUrl!)
+                              backgroundImage: user.photoUrl != null
+                                  ? CachedNetworkImageProvider(user.photoUrl!)
                                   : null,
-                              child: widget.user.photoUrl == null
+                              child: user.photoUrl == null
                                   ? Text(
-                                      widget.user.name[0].toUpperCase(),
+                                      user.name[0].toUpperCase(),
                                       style: const TextStyle(
                                         fontSize: 28,
                                         color: Colors.white,
@@ -118,7 +93,7 @@ class _UserCardState extends State<UserCard> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    widget.user.name,
+                                    user.name,
                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 18,
@@ -134,7 +109,7 @@ class _UserCardState extends State<UserCard> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    '${widget.user.age}',
+                                    '${user.age}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.white,
@@ -145,7 +120,7 @@ class _UserCardState extends State<UserCard> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            if (widget.subtitle != null)
+                            if (subtitle != null)
                               Row(
                                 children: [
                                   const Icon(
@@ -156,7 +131,7 @@ class _UserCardState extends State<UserCard> {
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
-                                      widget.subtitle!,
+                                      subtitle!,
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             color: AppTheme.textSecondary,
                                             fontWeight: FontWeight.w500,
@@ -166,12 +141,12 @@ class _UserCardState extends State<UserCard> {
                                   ),
                                 ],
                               ),
-                            if (widget.user.interests.isNotEmpty) ...[
+                            if (user.interests.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: widget.user.interests.take(3).map((interest) {
+                                children: user.interests.take(3).map((interest) {
                                   return Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -217,10 +192,6 @@ class _UserCardState extends State<UserCard> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
       ),
